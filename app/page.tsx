@@ -42,9 +42,14 @@ const lengths: Array<{ id: ReplyLength; icon: string }> = [
   { id: "larga", icon: "•••" },
 ];
 
-/** Límite de caracteres: comentario/post del oponente y postura/órdenes */
+/** Límites de caracteres (módulos estándar + Pro) */
 const MAX_OPPONENT_CHARS = 10_000;
 const MAX_STANCE_CHARS = 10_000;
+const MAX_POST_CHARS = 10_000;
+const MAX_NARRATIVE_CHARS = 10_000;
+const MAX_PERSON_CONTEXT_CHARS = 10_000;
+const MAX_PERSON_NAME_CHARS = 500;
+const MAX_PERSON_ROLE_CHARS = 500;
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("contraataque");
@@ -478,13 +483,13 @@ export default function Home() {
                 <span>Texto del post / lo que dice el post</span>
                 <textarea
                   value={postText}
-                  onChange={(e) => setPostText(e.target.value.slice(0, 2000))}
+                  onChange={(e) => setPostText(e.target.value.slice(0, MAX_POST_CHARS))}
                   placeholder="Pega el texto completo del post. Frases enteras, sin cortar a mitad…"
                   rows={6}
                 />
                 <span className="text-footer">
                   <span>Post</span>
-                  {postText.length}/2000
+                  {postText.length}/{MAX_POST_CHARS}
                 </span>
               </label>
             </div>
@@ -509,13 +514,15 @@ export default function Home() {
                 <span>Narrativa que quieres expresar</span>
                 <textarea
                   value={narrativeIntent}
-                  onChange={(e) => setNarrativeIntent(e.target.value.slice(0, 800))}
+                  onChange={(e) =>
+                    setNarrativeIntent(e.target.value.slice(0, MAX_NARRATIVE_CHARS))
+                  }
                   placeholder="Ej: Quiero que se vea que predica moral y no rinde cuentas; que el público sienta el bluff."
                   rows={4}
                 />
                 <span className="text-footer">
                   <span>Narrativa</span>
-                  {narrativeIntent.length}/800
+                  {narrativeIntent.length}/{MAX_NARRATIVE_CHARS}
                 </span>
               </label>
             </div>
@@ -531,16 +538,22 @@ export default function Home() {
                   <span>Nombre</span>
                   <input
                     value={personName}
-                    onChange={(e) => setPersonName(e.target.value.slice(0, 120))}
+                    onChange={(e) =>
+                      setPersonName(e.target.value.slice(0, MAX_PERSON_NAME_CHARS))
+                    }
                     placeholder="Ej: Maricel Cohen"
+                    maxLength={MAX_PERSON_NAME_CHARS}
                   />
                 </label>
                 <label className="mini-field">
                   <span>A qué se dedica / cargo</span>
                   <input
                     value={personRole}
-                    onChange={(e) => setPersonRole(e.target.value.slice(0, 160))}
+                    onChange={(e) =>
+                      setPersonRole(e.target.value.slice(0, MAX_PERSON_ROLE_CHARS))
+                    }
                     placeholder="Ej: empresaria, política, influencer…"
+                    maxLength={MAX_PERSON_ROLE_CHARS}
                   />
                 </label>
               </div>
@@ -548,10 +561,16 @@ export default function Home() {
                 <span>Contexto extra (historial, bando, por qué ataca)</span>
                 <textarea
                   value={personContext}
-                  onChange={(e) => setPersonContext(e.target.value.slice(0, 500))}
+                  onChange={(e) =>
+                    setPersonContext(e.target.value.slice(0, MAX_PERSON_CONTEXT_CHARS))
+                  }
                   placeholder="Lo que sepas: partidos, negocios, polémicas previas, relación contigo…"
                   rows={3}
                 />
+                <span className="text-footer">
+                  <span>Contexto</span>
+                  {personContext.length}/{MAX_PERSON_CONTEXT_CHARS}
+                </span>
               </label>
               <button
                 type="button"

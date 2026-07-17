@@ -281,15 +281,16 @@ export default function Home() {
         <div className="doodle heart" aria-hidden="true">
           ⚔
         </div>
-        <p className="eyebrow">Sin censura · frases completas · Pro multi-agente</p>
+        <p className="eyebrow">Comentarios y posts · sin censura · Pro multi-agente</p>
         <h1>
           Gana la guerra
           <br />
-          <span>de comentarios</span>
+          <span>de comentarios y post</span>
         </h1>
         <p className="lead">
-          Investiga al personaje, debate con <b>Schopenhauer e influencia</b>, elige variante y pega
-          el golpe en <b>Facebook</b> o <b>X</b>.
+          Respuestas y publicaciones listas: investiga al personaje, debate con{" "}
+          <b>Schopenhauer e influencia</b>, elige variante y pega el golpe en <b>Facebook</b> o{" "}
+          <b>X</b> — comentario o post.
         </p>
       </section>
 
@@ -587,8 +588,8 @@ export default function Home() {
             <p>
               <strong>
                 {isPro
-                  ? "Pro arma ficha, investiga, debate con 5 agentes y te da el comentario listo."
-                  : "Variantes + navegador de fallos. Frases completas. Sin censura blanda."}
+                  ? "Pro arma ficha, investiga, debate con 5 agentes y te da el texto listo (comentario o post)."
+                  : "Variantes + navegador de fallos. Comentarios y posts. Frases completas."}
               </strong>
               <br />
               Schopenhauer · influencia · masas · narrativa · psicología de los PDFs.
@@ -777,7 +778,7 @@ export default function Home() {
             </div>
 
             <div className="result-block">
-              <h3>Elige tu variante (comentario listo para el post)</h3>
+              <h3>Elige tu variante (listo para comentario o post)</h3>
               <div className="variant-tabs" role="tablist">
                 {variants.map((v, i) => (
                   <button
@@ -797,7 +798,7 @@ export default function Home() {
 
             <div className="result-block highlight">
               <h3>
-                Comentario para publicar{" "}
+                Listo para publicar (comentario o post){" "}
                 <span className="variant-current">{variants[selectedVariant]?.label ?? ""}</span>
               </h3>
               <blockquote>{counterattack}</blockquote>
@@ -805,7 +806,7 @@ export default function Home() {
 
             <div className="result-actions">
               <button className="copy-button" onClick={() => copyText("counter")}>
-                {copied === "counter" ? "✓ Copiado" : "▣ Copiar comentario"}
+                {copied === "counter" ? "✓ Copiado" : "▣ Copiar texto"}
               </button>
               <button className="copy-button secondary" onClick={() => copyText("full")}>
                 {copied === "full" ? "✓ Copiado" : "▣ Análisis + texto"}
@@ -885,7 +886,7 @@ export default function Home() {
           <summary>¿Qué hace el modo Pro?</summary>
           <p>
             Captura, ficha del personaje, research web, consejo de 5 agentes (Schopenhauer +
-            influencia/masas/narrativa/diablo), variantes y comentario listo.
+            influencia/masas/narrativa/diablo), variantes listas para comentario o post.
           </p>
         </details>
       </section>

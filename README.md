@@ -1,6 +1,6 @@
 # El Erístico Digital
 
-Combate verbal para guerras de comentarios en **Facebook** y **X**.
+Combate verbal para la guerra de **comentarios y posts** en **Facebook** y **X**.
 
 Entrenado en las **38 estratagemas de Arthur Schopenhauer**, persuasión/influencia y técnicas de marco (masas, prueba social, carga de la prueba).  
 **Sin censura blanda. Frases completas** (no truncados a mitad de idea).
@@ -14,7 +14,7 @@ Entrenado en las **38 estratagemas de Arthur Schopenhauer**, persuasión/influen
 | **Contraataque** | 3 variantes · tipo (datos / público / filosófico) · largo · navegador de fallos |
 | **Desmontar** | Lee tácticas del rival y devuelve el golpe |
 | **Arsenal** | Paquete completo del system prompt (E1, 4, 5, 6, 9, 12, 15, 16) |
-| **Pro** | Captura de post · ficha del personaje · research web · consejo multi-agente · narrativa · comentario listo |
+| **Pro** | Captura de post · ficha del personaje · research web · consejo multi-agente · narrativa · texto listo (comentario o post) |
 
 ### Modo Pro
 
@@ -27,7 +27,7 @@ Entrenado en las **38 estratagemas de Arthur Schopenhauer**, persuasión/influen
    - Masas (enemigo, etiqueta, división)
    - Narrativa (gancho, núcleo humano, anti-slop)
    - Abogado del Diablo (anticipa el contraataque)
-5. Elige variante y copia el **comentario para publicar**.
+5. Elige variante y copia el **texto listo** (comentario o post).
 
 ### Estilos de escritura
 

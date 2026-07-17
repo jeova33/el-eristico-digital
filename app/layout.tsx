@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "El Erístico Digital | Gana la guerra de comentarios",
+  title: "El Erístico Digital | Gana la guerra de comentarios y post",
   description:
-    "Maestro de combate verbal con las 38 estratagemas de Schopenhauer. Análisis táctico + contraataque listo para Facebook y X.",
+    "Combate verbal con las 38 estratagemas de Schopenhauer. Comentarios y posts listos para Facebook y X.",
   other: {
     "codex-preview": "development",
   },

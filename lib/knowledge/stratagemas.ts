@@ -1,6 +1,6 @@
 /**
  * Las 38 estratagemas de Arthur Schopenhauer — Dialéctica Erística
- * Adaptadas a guerra de comentarios digital (era redes sociales).
+ * Adaptadas a guerra de comentarios y posts digital (era redes sociales).
  * Fuente: Las 38 Estratagemas de Schopenhauer: Persuasión Moderna...
  */
 

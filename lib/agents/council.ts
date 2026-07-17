@@ -3,7 +3,12 @@
  * Schopenhauer + influencia + masas + narrativa + abogado del diablo.
  */
 
-import { pickAbilities, selectAbilitiesForText, type Ability } from "../knowledge/abilities";
+import {
+  ABILITIES,
+  pickAbilities,
+  selectAbilitiesForText,
+  type Ability,
+} from "../knowledge/abilities";
 import { polishComplete } from "../knowledge/styles";
 import {
   analyzeContent,

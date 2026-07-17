@@ -1,97 +1,61 @@
 # El Erístico Digital
 
-Aplicación web de **combate verbal** para guerras de comentarios en Facebook y X.
+Combate verbal para guerras de comentarios en **Facebook** y **X**.
 
-Entrenada en las **38 estratagemas de Arthur Schopenhauer** (Dialéctica Erística) y
-principios de persuasión moderna: audiencia primero, prueba social, carga cognitiva,
-asimetría de la prueba, tribalismo y enmarcado.
+Entrenado en las **38 estratagemas de Arthur Schopenhauer**, persuasión/influencia y técnicas de marco (masas, prueba social, carga de la prueba).  
+**Sin censura blanda. Frases completas** (no truncados a mitad de idea).
 
-## Qué hace
+**Repo:** https://github.com/jeova33/el-eristico-digital
 
-1. **Contraataque** — pegas el comentario del oponente + tu postura → análisis táctico + texto listo para publicar.
-2. **Desmontar** — detecta tácticas del rival y devuelve el golpe con marco a tu favor.
-3. **Arsenal** — dispara el paquete completo del system prompt (E1, 4, 5, 6, 9, 12, 15, 16).
+## Modos
 
-### Intensidades
+| Modo | Qué hace |
+|------|----------|
+| **Contraataque** | 3 variantes · tipo (datos / público / filosófico) · largo · navegador de fallos |
+| **Desmontar** | Lee tácticas del rival y devuelve el golpe |
+| **Arsenal** | Paquete completo del system prompt (E1, 4, 5, 6, 9, 12, 15, 16) |
+| **Pro** | Captura de post · ficha del personaje · research web · consejo multi-agente · narrativa · comentario listo |
 
-| Intensidad  | Estilo                                              |
-| ----------- | --------------------------------------------------- |
-| Cirujano    | Frío, preciso, ironía controlada                    |
-| Viral       | Optimizado para likes y punchline                   |
-| Devastador  | Máxima presión: avalancha + ad hominem + cierre     |
+### Modo Pro
 
-### Formato de salida (system prompt)
+1. Sube **captura** del post + pega el **texto completo**.
+2. Ficha: **quién lo dice**, a qué se dedica, contexto.
+3. **Narrativa** que quieres imponer + tu postura.
+4. **Research** (Wikipedia + búsquedas) y **consejo de 5 agentes**:
+   - Schopenhauer (erística)
+   - Influencia (prueba social, autoridad, escasez)
+   - Masas (enemigo, etiqueta, división)
+   - Narrativa (gancho, núcleo humano, anti-slop)
+   - Abogado del Diablo (anticipa el contraataque)
+5. Elige variante y copia el **comentario para publicar**.
 
-```
-Análisis Táctico (Breve): …
-El Contraataque: … (listo para copiar y pegar)
-```
+### Estilos de escritura
 
-## Conocimiento embebido
+Calle · Humano (anti-IA) · Narrativo · Erístico · Filosófico crudo · Datos duros
 
-- `lib/knowledge/stratagemas.ts` — las 38 estratagemas + nombres digitales.
-- `lib/knowledge/persuasion.ts` — system prompt + principios de influencia.
-- `lib/eristico-engine.ts` — motor local que aplica estratagemas al texto.
+## Stack de conocimiento
 
-Fuentes de referencia usadas en el diseño del motor:
+- `lib/knowledge/stratagemas.ts` — 38 estratagemas
+- `lib/knowledge/persuasion.ts` — system prompt + influencia
+- `lib/knowledge/abilities.ts` — habilidades de PDFs (psicología, masas, manipulación)
+- `lib/knowledge/styles.ts` — estilos + `polishComplete` (sin frases a medias)
+- `lib/agents/council.ts` — multi-agente
+- `lib/research/person-research.ts` — ficha / Wikipedia
+- `lib/pro-engine.ts` — motor Pro
+- `app/api/research/route.ts` — API research
 
-- Las 38 estratagemas de Schopenhauer (persuasión moderna / derrota argumentativa)
-- Psicología de la persuasión e influencia (leyes, masas, marcos)
-
-## Estado actual
-
-MVP con motor **local/demostrativo** (sin API de IA en el cliente). La UI y la lógica
-táctica funcionan offline en el navegador. Para producción, sustituye el motor por
-`POST /api/generate` con el system prompt de `persuasion.ts`.
-
-## Requisitos
-
-- Node.js 22.13 o superior
-- npm 10 o superior
-
-## Ejecutar localmente
+## Correr en local (Windows)
 
 ```bash
 npm ci
-npm run dev
+npx next dev -p 3456
 ```
 
-Compilación y validación:
+Abre http://127.0.0.1:3456
 
-```bash
-npm run build
-npm run validate:artifact
-```
+> `npm run dev` usa Vite + Cloudflare Miniflare y puede fallar en Windows. Preferir Next.
 
-## Archivos principales
+## Licencia / uso
 
-- `app/page.tsx` — interfaz El Erístico Digital
-- `app/globals.css` — tema dark / magenta combate
-- `lib/eristico-engine.ts` — generación de contraataques
-- `lib/knowledge/*` — estratagemas y persuasión
-- `worker/index.ts` — entrada Cloudflare Worker (Vinext)
-
-## Conectar una IA real
-
-Reemplaza la llamada a `generateEristic` en `page.tsx` por `POST /api/generate`.
-
-Cuerpo sugerido:
-
-```json
-{
-  "mode": "contraataque",
-  "intensity": "viral",
-  "opponentText": "…",
-  "stanceText": "…"
-}
-```
-
-System prompt: export `SYSTEM_PROMPT_CORE` desde `lib/knowledge/persuasion.ts`.
-Nunca expongas la API key en el cliente.
-
-## Seguridad y ética
-
-- No publica por ti.
-- No almacena conversaciones en esta demo.
-- Es una herramienta de **dialéctica erística** (parecer tener razón). Úsala con criterio;
-  también sirve para **reconocer** las mismas tácticas cuando te las aplican.
+Herramienta de dialéctica erística (parecer tener razón). Tú decides qué publicas.  
+No está pensada para delitos, acoso ilegal ni doxxing.

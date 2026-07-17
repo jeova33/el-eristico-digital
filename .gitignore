@@ -12,8 +12,9 @@ build/
 .sites-runtime/
 .openai/
 
-# env
+# env (nunca subir claves)
 .env
+.env.local
 .env*.local
 
 # logs / OS

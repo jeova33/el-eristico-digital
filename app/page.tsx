@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import {
   FOCUS_GUIDE,
   LENGTH_GUIDE,
-  generateEristic,
   type DebateBrowser,
   type Intensity,
   type Mode,
@@ -12,7 +11,6 @@ import {
   type ReplyLength,
   type ReplyVariant,
 } from "../lib/eristico-engine";
-import { generatePro } from "../lib/pro-engine";
 import type { CouncilResult } from "../lib/agents/council";
 import type { ResearchPack } from "../lib/research/person-research";
 import { WRITE_STYLES, type WriteStyleId } from "../lib/knowledge/styles";
@@ -75,6 +73,10 @@ export default function Home() {
   const [browserOpen, setBrowserOpen] = useState(true);
   const [councilOpen, setCouncilOpen] = useState(true);
   const [seed, setSeed] = useState(0);
+  const [apiSource, setApiSource] = useState<"grok" | "local" | "local_fallback" | "">("");
+  const [apiModel, setApiModel] = useState("");
+  const [apiWarning, setApiWarning] = useState("");
+  const [apiError, setApiError] = useState("");
 
   const active = useMemo(() => modes.find((item) => item.id === mode)!, [mode]);
   const activeStrats = useMemo(
@@ -149,58 +151,108 @@ export default function Home() {
     setSeed(s);
     setGenerating(true);
     setCopied("none");
+    setApiError("");
+    setApiWarning("");
 
     let pack: ResearchPack | null = research;
     if (isPro && (personName.trim() || personRole.trim())) {
       pack = (await fetchResearch()) || pack;
     }
 
-    window.setTimeout(() => {
-      if (isPro) {
-        const out = generatePro({
-          postText: postText || opponentText,
-          opponentComment: opponentText || postText,
-          stanceText,
-          personName,
-          personRole,
-          personContext,
-          narrativeIntent: narrativeIntent || stanceText,
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
           intensity,
           focus,
           length,
           writeStyle,
-          research: pack,
-          seed: s,
-        });
-        setAnalysis(out.analysis);
-        setVariants(out.variants);
-        setCouncil(out.council);
-        setResearch(out.research);
-        setBrowser(null);
-        setStratagemIds(out.variants[0]?.stratagemIds ?? []);
-        setSelectedVariant(0);
-        setCouncilOpen(true);
-      } else {
-        const out = generateEristic({
-          mode: mode === "pro" ? "contraataque" : mode,
-          intensity,
           opponentText: attackSource,
-          stanceText: [stanceText, personName, personRole, personContext]
-            .filter(Boolean)
-            .join(" | "),
-          focus,
-          length,
+          postText: isPro ? postText || attackSource : undefined,
+          stanceText,
+          personName: isPro ? personName : undefined,
+          personRole: isPro ? personRole : undefined,
+          personContext: isPro ? personContext : undefined,
+          narrativeIntent: isPro ? narrativeIntent || stanceText : undefined,
+          researchNotes: pack?.notes,
           seed: s,
+        }),
+      });
+
+      const json = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        source?: "grok" | "local" | "local_fallback";
+        model?: string;
+        warning?: string;
+        data?: {
+          analysis?: string;
+          attackProfile?: string;
+          plainSummary?: string;
+          weakPoints?: DebateBrowser["weakPoints"];
+          winLevers?: string[];
+          avoid?: string[];
+          researchLeads?: string[];
+          searchQueries?: string[];
+          variants?: ReplyVariant[];
+          council?: {
+            synthesis: string;
+            turns: Array<{
+              agentId: string;
+              agentName: string;
+              color: string;
+              read: string;
+              move: string;
+            }>;
+          } | null;
+        };
+      };
+
+      if (!json.ok || !json.data?.variants?.length) {
+        setApiError(json.error || "No se pudo generar. Revisa XAI_API_KEY o reintenta.");
+        setGenerating(false);
+        return;
+      }
+
+      const d = json.data;
+      setApiSource(json.source || "");
+      setApiModel(json.model || "");
+      setApiWarning(json.warning || "");
+      setAnalysis(d.analysis || "");
+      setVariants(d.variants);
+      setStratagemIds(d.variants[0]?.stratagemIds ?? []);
+      setSelectedVariant(0);
+
+      if (d.council?.turns?.length) {
+        setCouncil({
+          synthesis: d.council.synthesis,
+          turns: d.council.turns.map((t) => ({
+            ...t,
+            agentId: t.agentId as CouncilResult["turns"][0]["agentId"],
+            abilities: [],
+          })),
+          finalStrike: d.variants[0]?.text || "",
+          narrativeStrike: d.variants[1]?.text || "",
         });
-        setAnalysis(out.analysis);
-        setVariants(out.variants);
-        setBrowser(out.browser);
+        setCouncilOpen(true);
+        setBrowser(null);
+      } else {
         setCouncil(null);
-        setStratagemIds(out.stratagemIds);
-        setSelectedVariant(0);
+        setBrowser({
+          attackProfile: d.attackProfile || "Análisis Grok",
+          plainSummary: d.plainSummary || "",
+          weakPoints: d.weakPoints || [],
+          researchLeads: d.researchLeads || [],
+          searchQueries: d.searchQueries || [],
+          winLevers: d.winLevers || [],
+          avoid: d.avoid || [],
+        });
         setBrowserOpen(true);
       }
-      setGenerating(false);
+      if (pack) setResearch(pack);
+
       window.setTimeout(
         () =>
           document
@@ -208,7 +260,11 @@ export default function Home() {
             ?.scrollIntoView({ behavior: "smooth", block: "center" }),
         80,
       );
-    }, isPro ? 200 : 650);
+    } catch (e) {
+      setApiError(e instanceof Error ? e.message : "Error de red al llamar /api/generate");
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function generate() {
@@ -571,30 +627,40 @@ export default function Home() {
             {generating || researching
               ? researching
                 ? "Investigando personaje…"
-                : "Consejo de agentes…"
+                : "Grok pensando el claim…"
               : isPro
-                ? "Pro: research + debate + golpe"
+                ? "Pro · Grok: research + golpe"
                 : mode === "desmontar"
-                  ? "Desmontar y devolver"
+                  ? "Desmontar con Grok"
                   : mode === "arsenal"
-                    ? "Disparar arsenal"
-                    : "Generar 3 variantes"}
+                    ? "Arsenal con Grok"
+                    : "Generar con Grok (xAI)"}
           </button>
         </div>
+
+        {apiError && (
+          <div className="api-banner error" role="alert">
+            <strong>Error:</strong> {apiError}
+          </div>
+        )}
+        {apiWarning && !apiError && (
+          <div className="api-banner warn" role="status">
+            <strong>Aviso:</strong> {apiWarning}
+          </div>
+        )}
 
         {!hasResult && (
           <div className="ready-line">
             <span className="check">⚔</span>
             <p>
               <strong>
-                {isPro
-                  ? "Pro arma ficha, investiga, debate con 5 agentes y te da el texto listo (comentario o post)."
-                  : "Variantes + navegador de fallos. Comentarios y posts. Frases completas."}
+                Motor principal: <b>Grok (xAI)</b> — coherente con el post real.
               </strong>
               <br />
-              Schopenhauer · influencia · masas · narrativa · psicología de los PDFs.
+              Configura <code>XAI_API_KEY</code> en <code>.env.local</code>. Sin clave = motor local
+              (plantillas, peor calidad).
             </p>
-            <span className="ready-copy">▣&nbsp;&nbsp; Copy-paste</span>
+            <span className="ready-copy">▣&nbsp;&nbsp; API</span>
           </div>
         )}
 
@@ -603,6 +669,7 @@ export default function Home() {
             <div className="result-top">
               <span>✦ El Erístico Digital</span>
               <span className="result-badge">
+                {apiSource === "grok" ? `Grok · ${apiModel || "xAI"}` : apiSource || "local"} ·{" "}
                 {active.label} · {writeStyle} · {FOCUS_GUIDE[focus].label} ·{" "}
                 {LENGTH_GUIDE[length].label} · {intensity}
               </span>

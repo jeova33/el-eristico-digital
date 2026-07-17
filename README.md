@@ -44,16 +44,32 @@ Calle · Humano (anti-IA) · Narrativo · Erístico · Filosófico crudo · Dato
 - `lib/pro-engine.ts` — motor Pro
 - `app/api/research/route.ts` — API research
 
+## API Grok (xAI) — motor principal
+
+Las respuestas coherentes van por **Grok** en el servidor (`POST /api/generate`).  
+La clave **nunca** va al navegador.
+
+1. Crea clave en https://console.x.ai  
+2. En la raíz del proyecto:
+
+```bash
+copy .env.example .env.local
+# edita .env.local y pon:
+# XAI_API_KEY=xai-...
+# XAI_MODEL=grok-4.5   (opcional)
+```
+
+3. Reinicia el servidor. El badge del resultado debe decir **Grok · …**  
+   Sin clave: motor local (plantillas) con aviso amarillo.
+
 ## Correr en local (Windows)
 
 ```bash
 npm ci
-npx next dev -p 3456
+npm run dev
 ```
 
 Abre http://127.0.0.1:3456
-
-> `npm run dev` usa Vite + Cloudflare Miniflare y puede fallar en Windows. Preferir Next.
 
 ## Licencia / uso
 

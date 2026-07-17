@@ -81,7 +81,7 @@ export async function POST(req: Request) {
         provider,
         jsonMode: true,
         messages: [
-          { role: "system", content: buildSystemPrompt() },
+          { role: "system", content: buildSystemPrompt(body) },
           { role: "user", content: buildUserPrompt(body) },
         ],
         temperature:

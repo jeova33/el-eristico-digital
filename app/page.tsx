@@ -624,7 +624,7 @@ export default function Home() {
                 onChange={(event) =>
                   setStanceText(event.target.value.slice(0, MAX_STANCE_CHARS))
                 }
-                placeholder='Ej: "Ten criterio, cátedra de datos y termina con frases bíblicas."'
+                placeholder='Ej: "Ten criterio, cátedra de datos y termina con frases bíblicas." · Si quieres groserías: "modo irreverente, con insultos y foul".'
                 rows={5}
               />
               <span className="text-footer">
@@ -644,7 +644,7 @@ export default function Home() {
                 onChange={(event) =>
                   setStanceText(event.target.value.slice(0, MAX_STANCE_CHARS))
                 }
-                placeholder='Ej: "Criterio firme, cátedra de datos y termina con frases bíblicas."'
+                placeholder='Ej: "Criterio firme y datos." · Groserías solo si las pides: "tono irreverente, sin filtro".'
                 rows={3}
               />
               <span className="text-footer">
@@ -1157,8 +1157,11 @@ export default function Home() {
         <details>
           <summary>¿Las respuestas van sin censura?</summary>
           <p>
-            Sí: el motor no suaviza el golpe erístico. Tú decides si publicas. No inventa delitos ni
-            doxxing ilegal; ataca argumento, pose y credibilidad pública.
+            Sí: el motor no suaviza el golpe erístico. Argumento siempre lógico y al punto. Si pides
+            groserías o tono irreverente en las órdenes (o en estilo/tipo a tu medida), activa{" "}
+            <b>Grok irreverente</b>: foul extremo como potenciador retórico, sin sustituir la lógica.
+            Sin ese pedido, va firme pero sin lenguaje altamente profano. Tú decides si publicas. No
+            inventa delitos ni doxxing ilegal.
           </p>
         </details>
         <details>

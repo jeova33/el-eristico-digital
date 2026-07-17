@@ -6,9 +6,13 @@
 import type { Intensity, Mode, ReplyFocus, ReplyLength } from "../eristico-engine";
 import type { WriteStyleId } from "../knowledge/styles";
 import { LENGTH_GUIDE, resolveFocusPrompt } from "../eristico-engine";
-import { INTENSITY_GUIDE } from "../knowledge/persuasion";
+import {
+  detectIrreverentRequest,
+  GROK_IRREVERENTE_ACTIVE_BLOCK,
+  INTENSITY_GUIDE,
+  SYSTEM_PROMPT_CORE,
+} from "../knowledge/persuasion";
 import { resolveWriteStylePrompt } from "../knowledge/styles";
-import { SYSTEM_PROMPT_CORE } from "../knowledge/persuasion";
 import { analyzeContent } from "../content-analysis";
 import {
   abilitiesDigestForPrompt,
@@ -127,17 +131,28 @@ export function sanitizePublishableText(raw: string): string {
   return t.trim();
 }
 
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(body?: GenerateRequestBody): string {
+  const irreverent = body
+    ? detectIrreverentRequest(
+        body.stanceText,
+        body.writeStyleCustom,
+        body.focusCustom,
+        body.narrativeIntent,
+        body.personContext,
+      )
+    : false;
+
   return `${SYSTEM_PROMPT_CORE}
 
+${irreverent ? `${GROK_IRREVERENTE_ACTIVE_BLOCK}\n` : ""}
 ARSENAL INTERNO (usa 4–8 habilidades en analysis; NUNCA las nombres en variants[].text):
 ${abilitiesDigestForPrompt(20)}
 
 REGLAS DE SALIDA JSON:
 1. variants[].text = ÚNICAMENTE el texto que el usuario pega en el grupo. Voz humana. Sin meta.
-2. analysis = panel interno: di qué habilidades/tácticas usaste (ids o nombres).
-3. Cumple ÓRDENES DEL USUARIO dentro del texto publicable.
-4. Responde al claim REAL del post. Citas solo oraciones completas si citas.
+2. analysis = panel interno: di qué habilidades/tácticas usaste (ids o nombres). Si modo irreverente, anótalo.
+3. Cumple ÓRDENES DEL USUARIO dentro del texto publicable (incl. groserías solo si las pidió).
+4. Responde al claim REAL del post. Argumento lógico siempre. Citas solo oraciones completas si citas.
 5. JSON puro, sin markdown.
 6. abilityIds: array opcional de ids del arsenal que aplicaste (ej. ["amplify","burden","hook"]).`;
 }
@@ -154,6 +169,13 @@ export function buildUserPrompt(body: GenerateRequestBody): string {
   const narrative = (body.narrativeIntent || "").trim();
   const selected = selectAbilitiesForText(opponent || post || "", 8);
   const selectedBlock = formatAbilitiesForAnalysis(selected);
+  const irreverent = detectIrreverentRequest(
+    stance,
+    body.writeStyleCustom,
+    body.focusCustom,
+    narrative,
+    body.personContext,
+  );
 
   return `MODO: ${body.mode}
 INTENSIDAD: ${INTENSITY_GUIDE[body.intensity].label} — ${INTENSITY_GUIDE[body.intensity].style}
@@ -164,7 +186,9 @@ PRESUPUESTO: ${budget.hint}
   → Mínimo ${budget.minSentences} oraciones y ${budget.minChars} caracteres en CADA variants[].text
 ESTILO: ${style.label}
 ${style.rulesText}
+GROK IRREVERENTE: ${irreverent ? "ON (usuario pidió groserías / tono subido)" : "OFF (firme sin lenguaje altamente profano)"}
 
+${irreverent ? `${GROK_IRREVERENTE_ACTIVE_BLOCK}\n` : ""}
 === POST O COMENTARIO AL QUE RESPONDES (texto real del hilo) ===
 ${opponent || "(vacío)"}
 
@@ -198,6 +222,7 @@ Devuelve JSON con:
   * Responde al mensaje de arriba como en un grupo de Facebook.
   * PROHIBIDO: "el oponente", "análisis táctico", "estratagema", "el contraataque", meta de IA.
   * Cumple las órdenes del usuario.
+  * Argumentación lógica y al punto aunque el tono sea crudo.
   * Ángulos: A reencuadre · B datos/criterio · C público/cierre (órdenes incluidas).
 
 ${isPro ? `council: 5 agentes (schopenhauer, influencia, masas, narrativa, diablo) solo en panel interno; sus "move" describen táctica, NO son el texto a pegar.` : `"council": null`}

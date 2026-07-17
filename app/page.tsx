@@ -579,16 +579,16 @@ export default function Home() {
               </span>
             </label>
             <label className="text-box">
-              <span>Tu postura · quién habla · contexto</span>
+              <span>Mi postura + órdenes (se cumplen en cada variante)</span>
               <textarea
                 value={stanceText}
-                onChange={(event) => setStanceText(event.target.value.slice(0, 800))}
-                placeholder="Qué defiendes. Si sabes quién es el rival y a qué se dedica, escríbelo aquí."
+                onChange={(event) => setStanceText(event.target.value.slice(0, 1200))}
+                placeholder='Ej: "Ten criterio, cátedra de datos y termina con frases bíblicas."'
                 rows={5}
               />
               <span className="text-footer">
-                <span>Tu marco</span>
-                {stanceText.length}/800
+                <span>Órdenes al motor</span>
+                {stanceText.length}/1200
               </span>
             </label>
           </div>

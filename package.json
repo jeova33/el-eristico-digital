@@ -11,7 +11,7 @@
     "dev:vite": "vite",
     "build": "next build",
     "build:worker": "bash scripts/build-verified.sh",
-    "start": "next start -p 3456",
+    "start": "next start -H 0.0.0.0 -p $PORT",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",

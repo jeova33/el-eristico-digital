@@ -167,8 +167,13 @@ function localFallback(body: GenerateRequestBody) {
     };
   }
 
+  const localMode =
+    body.mode === "desmontar" || body.mode === "arsenal"
+      ? body.mode
+      : "contraataque";
+
   const out = generateEristic({
-    mode: body.mode === "pro" ? "contraataque" : body.mode,
+    mode: localMode,
     intensity: body.intensity,
     opponentText: body.opponentText || body.postText || "",
     stanceText: body.stanceText || "",

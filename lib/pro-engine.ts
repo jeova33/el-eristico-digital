@@ -30,6 +30,7 @@ export type ProInput = {
   length?: ReplyLength;
   writeStyle?: WriteStyleId;
   writeStyleCustom?: string;
+  focusCustom?: string;
   research?: ResearchPack | null;
   seed?: number;
 };

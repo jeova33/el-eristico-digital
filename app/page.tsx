@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   FOCUS_GUIDE,
   LENGTH_GUIDE,
+  MAX_FOCUS_CUSTOM_CHARS,
   type DebateBrowser,
   type Intensity,
   type Mode,
@@ -34,10 +35,12 @@ const intensities: Array<{ id: Intensity; icon: string; label: string }> = [
   { id: "devastador", icon: "🔥", label: "Devastador" },
 ];
 
-const focuses: Array<{ id: ReplyFocus; icon: string }> = [
+const focuses: Array<{ id: ReplyFocus; icon: string; special?: boolean }> = [
   { id: "datos", icon: "📊" },
   { id: "publico", icon: "👥" },
   { id: "filosofico", icon: "☯" },
+  { id: "libre", icon: "✦", special: true },
+  { id: "custom", icon: "✎", special: true },
 ];
 
 const lengths: Array<{ id: ReplyLength; icon: string }> = [
@@ -59,6 +62,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("contraataque");
   const [intensity, setIntensity] = useState<Intensity>("viral");
   const [focus, setFocus] = useState<ReplyFocus>("publico");
+  const [focusCustom, setFocusCustom] = useState("");
   const [length, setLength] = useState<ReplyLength>("media");
   const [writeStyle, setWriteStyle] = useState<WriteStyleId>("eristico");
   const [writeStyleCustom, setWriteStyleCustom] = useState("");
@@ -246,6 +250,7 @@ export default function Home() {
           mode,
           intensity,
           focus,
+          focusCustom: focus === "custom" ? focusCustom.trim() || undefined : undefined,
           length,
           writeStyle,
           writeStyleCustom:
@@ -735,13 +740,16 @@ export default function Home() {
 
         <div className="control-block">
           <strong className="control-label">Tipo de respuesta</strong>
-          <p className="control-hint">Sin tecnicismos de adorno. Sin frases incompletas. Sin censura blanda.</p>
+          <p className="control-hint">
+            Sin tecnicismos de adorno. Sin frases incompletas. Sin censura blanda. También{" "}
+            <b>libre (la IA decide)</b> o <b>a tu medida</b> (describes el tipo).
+          </p>
           <div className="chip-row" role="group" aria-label="Tipo de respuesta">
             {focuses.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                className={`chip ${focus === item.id ? "active" : ""}`}
+                className={`chip ${focus === item.id ? "active" : ""} ${item.special ? "chip-special" : ""}`}
                 onClick={() => setFocus(item.id)}
               >
                 <span aria-hidden="true">{item.icon}</span>
@@ -752,6 +760,28 @@ export default function Home() {
               </button>
             ))}
           </div>
+          {focus === "libre" && (
+            <p className="control-hint style-extra-hint">
+              La IA elige el enfoque (datos, público, filosófico o mezcla) que más gane este hilo.
+            </p>
+          )}
+          {focus === "custom" && (
+            <label className="text-box style-custom-box">
+              <span>Describe el tipo de respuesta que quieres</span>
+              <textarea
+                value={focusCustom}
+                onChange={(e) =>
+                  setFocusCustom(e.target.value.slice(0, MAX_FOCUS_CUSTOM_CHARS))
+                }
+                placeholder='Ej: "Como vecino cansado: corto, con un dato simple y una pregunta que deje mal parado al que se hace el experto."'
+                rows={3}
+              />
+              <span className="text-footer">
+                <span>Tu tipo</span>
+                {focusCustom.length}/{MAX_FOCUS_CUSTOM_CHARS}
+              </span>
+            </label>
+          )}
         </div>
 
         <div className="control-block">

@@ -698,6 +698,12 @@ main {
 .chip.active b {
   color: var(--pink-glow);
 }
+.chip-special {
+  border-style: dashed;
+}
+.chip-special.active {
+  border-style: solid;
+}
 
 .action-row {
   display: grid;

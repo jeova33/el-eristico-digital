@@ -235,6 +235,7 @@ function localFallback(body: GenerateRequestBody) {
       narrativeIntent: body.narrativeIntent || body.stanceText || "",
       intensity: body.intensity,
       focus: body.focus,
+      focusCustom: body.focusCustom,
       length: body.length,
       writeStyle: body.writeStyle,
       writeStyleCustom: body.writeStyleCustom,
@@ -279,6 +280,7 @@ function localFallback(body: GenerateRequestBody) {
     opponentText: body.opponentText || body.postText || "",
     stanceText: body.stanceText || "",
     focus: body.focus,
+    focusCustom: body.focusCustom,
     length: body.length,
     seed: body.seed,
   });

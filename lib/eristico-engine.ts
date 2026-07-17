@@ -26,7 +26,7 @@ export type { Intensity };
 export type Mode = "contraataque" | "desmontar" | "arsenal" | "pro";
 
 /** Cómo quieres que suene la respuesta */
-export type ReplyFocus = "datos" | "publico" | "filosofico";
+export type ReplyFocus = "datos" | "publico" | "filosofico" | "libre" | "custom";
 
 /** Largo del comentario */
 export type ReplyLength = "corta" | "media" | "larga";
@@ -37,10 +37,53 @@ export type EngineInput = {
   opponentText: string;
   stanceText: string;
   focus?: ReplyFocus;
+  /** Descripción libre cuando focus === "custom" */
+  focusCustom?: string;
   length?: ReplyLength;
   /** Semilla para variar textos al pedir "otra ronda" */
   seed?: number;
 };
+
+const MAX_FOCUS_CUSTOM_CHARS = 2000;
+
+/** Enfoque efectivo para plantillas locales (libre/custom → público o mixto vía callers). */
+export function resolveFocusForTemplates(focus: ReplyFocus | undefined): "datos" | "publico" | "filosofico" {
+  if (focus === "datos" || focus === "publico" || focus === "filosofico") return focus;
+  return "publico";
+}
+
+/** Texto de enfoque para prompts LLM (incluye libre + custom del usuario). */
+export function resolveFocusPrompt(
+  focusId: ReplyFocus | string | undefined,
+  focusCustom?: string,
+): { id: string; label: string; styleText: string } {
+  const id = (focusId || "publico") as ReplyFocus;
+  const meta = FOCUS_GUIDE[id] ?? FOCUS_GUIDE.publico;
+  const custom = (focusCustom || "").trim().slice(0, MAX_FOCUS_CUSTOM_CHARS);
+
+  if (id === "custom") {
+    const styleText = custom
+      ? `TIPO DE RESPUESTA PERSONALIZADO DEL USUARIO (obligatorio):\n${custom}\nAdemás: ${meta.style}`
+      : `El usuario eligió tipo "A tu medida" sin describirlo: elige el enfoque (datos / público / filosófico o mezcla) que más gane el hilo. ${meta.style}`;
+    return { id, label: meta.label, styleText };
+  }
+
+  if (id === "libre") {
+    return {
+      id,
+      label: meta.label,
+      styleText: `TIPO LIBRE: la IA elige el enfoque óptimo (datos, público general, filosófico o mezcla) según el post/comentario. ${meta.style}`,
+    };
+  }
+
+  return {
+    id,
+    label: meta.label,
+    styleText: `${meta.label} — ${meta.style}`,
+  };
+}
+
+export { MAX_FOCUS_CUSTOM_CHARS };
 
 export type ReplyVariant = {
   id: string;
@@ -106,6 +149,18 @@ export const FOCUS_GUIDE: Record<
     hint: "Ideas grandes, sin ser pedante",
     style:
       "Preguntas profundas y sentido común elevado. Suena a sabio de café, no a manual universitario.",
+  },
+  libre: {
+    label: "Libre",
+    hint: "La IA elige el enfoque",
+    style:
+      "TÚ eliges el tipo de respuesta (datos, público, filosófico o mezcla) que más gane este hilo. Sin plantilla. Frases completas.",
+  },
+  custom: {
+    label: "A tu medida",
+    hint: "Escribes tú el tipo",
+    style:
+      "Sigue EXACTAMENTE el tipo de respuesta que describe el usuario. Si choca con una convención genérica, gana lo del usuario.",
   },
 };
 
@@ -223,7 +278,8 @@ type BuildOpts = {
 
 function openers(focus: ReplyFocus, intensity: Intensity, quote: string, vi: number): string[] {
   const q = clip(quote, 55);
-  const pool: Record<ReplyFocus, string[]> = {
+  const f = resolveFocusForTemplates(focus);
+  const pool: Record<"datos" | "publico" | "filosofico", string[]> = {
     datos: [
       `Antes de gritar, ¿dónde está el número que respalda “${q}”?`,
       `Bonita frase. Ahora el dato: ¿fuente, año, cifra? Porque “${q}” solo no alcanza.`,
@@ -243,10 +299,10 @@ function openers(focus: ReplyFocus, intensity: Intensity, quote: string, vi: num
   if (intensity === "devastador") {
     return [
       `Es revelador que se publique algo como “${q}” y se espere aplauso.`,
-      ...pool[focus],
+      ...pool[f],
     ];
   }
-  return pool[focus];
+  return pool[f];
 }
 
 function bodyChunks(
@@ -305,7 +361,8 @@ function bodyChunks(
     h + 4,
   );
 
-  const focusExtra: Record<ReplyFocus, string[]> = {
+  const f = resolveFocusForTemplates(focus);
+  const focusExtra: Record<"datos" | "publico" | "filosofico", string[]> = {
     datos: [
       `No pido un paper de 40 páginas: pido una cifra, un año, un hecho comprobable. “${q}” no es eso.`,
       `En la vida real contamos costos, tiempos y resultados. ¿Cuál es el tuyo, en números o en hechos?`,
@@ -323,12 +380,13 @@ function bodyChunks(
     ],
   };
 
-  return [amplify, burden, dichotomy, smoke, adHom, pick(focusExtra[focus], h + 5)];
+  return [amplify, burden, dichotomy, smoke, adHom, pick(focusExtra[f], h + 5)];
 }
 
 function closer(focus: ReplyFocus, intensity: Intensity, stance: string, vi: number): string {
   const st = clip(stance || "lo que se sostiene solo", 50);
-  const options: Record<ReplyFocus, string[]> = {
+  const f = resolveFocusForTemplates(focus);
+  const options: Record<"datos" | "publico" | "filosofico", string[]> = {
     datos: [
       `Cuando traigas el dato, hablamos. Hasta entonces, esto es monólogo con testigos.`,
       `Una prueba. Una. El resto es ruido.`,
@@ -363,7 +421,7 @@ function closer(focus: ReplyFocus, intensity: Intensity, stance: string, vi: num
       vi,
     );
   }
-  return pick(options[focus], vi);
+  return pick(options[f], vi);
 }
 
 function applyLength(parts: string[], length: ReplyLength): string {
@@ -389,9 +447,10 @@ function buildVariantText(
   opts: BuildOpts,
 ): string {
   const { focus, length, variantIndex } = opts;
+  const focusTpl = resolveFocusForTemplates(focus);
   // Respuesta ANCLADA al contenido real del post (no plantilla genérica)
   const analysis: ContentAnalysis = analyzeContent(opponentText);
-  const open = groundedOpener(analysis, focus, variantIndex);
+  const open = groundedOpener(analysis, focusTpl, variantIndex);
   const body = groundedBody(analysis, stanceText, stanceText, variantIndex);
   const end = groundedCloser(analysis, stanceText, variantIndex);
 

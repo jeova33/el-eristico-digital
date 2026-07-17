@@ -3,7 +3,7 @@
  * Schopenhauer + influencia + masas + narrativa + abogado del diablo.
  */
 
-import { ABILITIES, pickAbilities, type Ability } from "../knowledge/abilities";
+import { pickAbilities, selectAbilitiesForText, type Ability } from "../knowledge/abilities";
 import { polishComplete } from "../knowledge/styles";
 import {
   analyzeContent,
@@ -33,35 +33,67 @@ export const AGENTS: AgentVoice[] = [
     name: "Schopenhauer",
     role: "Dialéctica erística: ganar el debate a cualquier precio lógico",
     color: "#e91e8c",
-    abilityIds: ["amplify", "burden", "decontext", "adhom", "avalanche", "dichotomy", "indignation", "smoke"],
+    abilityIds: [
+      "amplify",
+      "burden",
+      "decontext",
+      "adhom",
+      "avalanche",
+      "dichotomy",
+      "indignation",
+      "smoke",
+      "ambiguity",
+      "trap-yes",
+    ],
   },
   {
     id: "influencia",
     name: "Agente Influencia",
-    role: "Prueba social, autoridad, compromiso, escasez de atención",
+    role: "Cialdini, 52 leyes, ciencia de la influencia, FOMO, anclaje",
     color: "#7c5cff",
-    abilityIds: ["social-proof", "authority", "commitment", "liking", "scarcity", "emotion-first"],
+    abilityIds: [
+      "social-proof",
+      "authority",
+      "commitment",
+      "liking",
+      "scarcity",
+      "reciprocity",
+      "anchor",
+      "foot-door",
+      "bandwagon",
+      "unity",
+    ],
   },
   {
     id: "masas",
     name: "Agente Masas",
-    role: "Enemigo abstracto, consenso falso, división, etiquetas",
+    role: "Contagio emocional, polarización, enemigo, sugestión de masa",
     color: "#ff6b5e",
-    abilityIds: ["enemy", "false-consensus", "divide", "label", "sunk-cost"],
+    abilityIds: [
+      "enemy",
+      "false-consensus",
+      "divide",
+      "label",
+      "emotional-contagion",
+      "suggestion",
+      "echo-chamber",
+      "tribal-shame",
+      "status-threat",
+    ],
   },
   {
     id: "narrativa",
     name: "Agente Narrativa",
-    role: "Gancho, núcleo humano, escena, anti-slop",
+    role: "Gancho, historia, anti-slop, punchline (voz humana)",
     color: "#ffd84d",
-    abilityIds: ["narrative-kernel", "hook", "anti-slop", "emotion-first"],
+    abilityIds: ["narrative-kernel", "hook", "anti-slop", "storytime", "punchline", "priming", "zeigarnik"],
   },
   {
     id: "diablo",
     name: "Abogado del Diablo",
-    role: "Busca el mejor golpe del rival y cómo aplastarlo igual",
+    role: "Anticipa el golpe del rival; proyección, reencuadre, carga de prueba",
     color: "#9a94b0",
-    abilityIds: ["burden", "decontext", "adhom", "commitment"],
+    abilityIds: ["burden", "decontext", "adhom", "commitment", "projection", "gaslight-light", "trojan"],
   },
 ];
 
@@ -114,8 +146,13 @@ export function runCouncil(input: CouncilInput): CouncilResult {
   const pct = content.percents[0];
   const isStats = content.kind === "estadistica" || content.kind === "exito_gobierno";
 
+  // Mezcla arsenal del agente + habilidades del post
+  const textAbilities = selectAbilitiesForText(input.opponentText || "", 6);
+
   const turns: AgentTurn[] = AGENTS.map((agent) => {
-    const abilities = pickAbilities(agent.abilityIds).slice(0, 4);
+    const base = pickAbilities(agent.abilityIds).slice(0, 3);
+    const extra = textAbilities.filter((t) => !base.some((b) => b.id === t.id)).slice(0, 2);
+    const abilities = [...base, ...extra].slice(0, 5);
     let read = "";
     let move = "";
 

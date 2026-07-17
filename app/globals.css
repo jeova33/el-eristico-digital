@@ -1230,6 +1230,41 @@ main {
   margin-top: 28px !important;
   font-size: 14px;
 }
+.ability-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+.ability-cat > h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: var(--pink-glow);
+}
+.ability-cat > p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tactic-grid.compact {
+  grid-template-columns: repeat(3, 1fr);
+}
+.tactic-grid.compact article h3 {
+  font-size: 14px;
+}
+.tactic-grid.compact article p {
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .tactic-grid.compact {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 520px) {
+  .tactic-grid.compact {
+    grid-template-columns: 1fr;
+  }
+}
 
 .examples {
   display: grid;

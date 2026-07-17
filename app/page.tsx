@@ -15,7 +15,7 @@ import type { CouncilResult } from "../lib/agents/council";
 import type { ResearchPack } from "../lib/research/person-research";
 import { WRITE_STYLES, type WriteStyleId } from "../lib/knowledge/styles";
 import { PRIMARY_ARSENAL, STRATAGEMS } from "../lib/knowledge/stratagemas";
-import { ABILITIES } from "../lib/knowledge/abilities";
+import { ABILITIES, ABILITY_CATEGORIES, abilitiesByTag } from "../lib/knowledge/abilities";
 
 const modes: Array<{ id: Mode; icon: string; label: string; hint: string }> = [
   { id: "contraataque", icon: "⚔", label: "Contraataque", hint: "Variantes listas" },
@@ -392,7 +392,7 @@ export default function Home() {
         </a>
         <nav aria-label="Navegación principal">
           <a href="#como-funciona">Cómo funciona</a>
-          <a href="#arsenal-38">38 estratagemas</a>
+          <a href="#arsenal-38">Habilidades</a>
           <a href="#preguntas">Preguntas</a>
         </nav>
         <a className="login" href="#planes">
@@ -1022,20 +1022,38 @@ export default function Home() {
       </section>
 
       <section className="tactics" id="arsenal-38">
-        <p className="section-kicker">Habilidades (PDFs + Schopenhauer)</p>
-        <h2>Arsenal operativo</h2>
-        <div className="tactic-grid">
-          {ABILITIES.slice(0, 8).map((a) => (
-            <article key={a.id}>
-              <span>{a.source}</span>
-              <h3>{a.name}</h3>
-              <p>{a.use}</p>
-            </article>
-          ))}
+        <p className="section-kicker">Arsenal de habilidades</p>
+        <h2>Psicología · influencia · manipulación · erística</h2>
+        <p className="tactics-note" style={{ marginBottom: 28 }}>
+          Destilado de PDFs (Telegram / Gamma): Schopenhauer, Cialdini, 52 leyes, ciencia de la
+          influencia, 7 técnicas prohibidas, manipulación mental y de masas, emociones colectivas,
+          manipulación emocional digital. Se usan por dentro al generar; el texto a pegar sigue
+          siendo voz humana.
+        </p>
+        <div className="ability-cats">
+          {ABILITY_CATEGORIES.map((cat) => {
+            const items = abilitiesByTag(cat.id).slice(0, 6);
+            if (!items.length) return null;
+            return (
+              <div key={cat.id} className="ability-cat">
+                <h3>{cat.label}</h3>
+                <p>{cat.description}</p>
+                <div className="tactic-grid compact">
+                  {items.map((a) => (
+                    <article key={a.id}>
+                      <span>{a.source}</span>
+                      <h3>{a.name}</h3>
+                      <p>{a.use}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
         <p className="tactics-note">
-          {ABILITIES.length} habilidades activas · {STRATAGEMS.length} estratagemas · core{" "}
-          {PRIMARY_ARSENAL.map((n) => `E${n}`).join(", ")}.
+          {ABILITIES.length} habilidades · {STRATAGEMS.length} estratagemas Schopenhauer · core E
+          {PRIMARY_ARSENAL.join(", E")}.
         </p>
       </section>
 

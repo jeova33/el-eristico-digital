@@ -10,6 +10,11 @@ import { INTENSITY_GUIDE } from "../knowledge/persuasion";
 import { WRITE_STYLES } from "../knowledge/styles";
 import { SYSTEM_PROMPT_CORE } from "../knowledge/persuasion";
 import { analyzeContent } from "../content-analysis";
+import {
+  abilitiesDigestForPrompt,
+  selectAbilitiesForText,
+  formatAbilitiesForAnalysis,
+} from "../knowledge/abilities";
 
 export type GenerateRequestBody = {
   mode: Mode;
@@ -121,12 +126,16 @@ export function sanitizePublishableText(raw: string): string {
 export function buildSystemPrompt(): string {
   return `${SYSTEM_PROMPT_CORE}
 
+ARSENAL INTERNO (usa 4–8 habilidades en analysis; NUNCA las nombres en variants[].text):
+${abilitiesDigestForPrompt(20)}
+
 REGLAS DE SALIDA JSON:
 1. variants[].text = ÚNICAMENTE el texto que el usuario pega en el grupo. Voz humana. Sin meta.
-2. analysis = solo para el panel de la app (ahí sí táctica).
-3. Cumple ÓRDENES DEL USUARIO dentro del texto publicable (criterio, datos, bíblicas, etc.).
-4. Responde al claim REAL del post. Citas solo oraciones completas del original si citas.
-5. JSON puro, sin markdown.`;
+2. analysis = panel interno: di qué habilidades/tácticas usaste (ids o nombres).
+3. Cumple ÓRDENES DEL USUARIO dentro del texto publicable.
+4. Responde al claim REAL del post. Citas solo oraciones completas si citas.
+5. JSON puro, sin markdown.
+6. abilityIds: array opcional de ids del arsenal que aplicaste (ej. ["amplify","burden","hook"]).`;
 }
 
 export function buildUserPrompt(body: GenerateRequestBody): string {
@@ -138,6 +147,8 @@ export function buildUserPrompt(body: GenerateRequestBody): string {
   const budget = lengthBudget(body.length);
   const stance = (body.stanceText || "").trim();
   const narrative = (body.narrativeIntent || "").trim();
+  const selected = selectAbilitiesForText(opponent || post || "", 8);
+  const selectedBlock = formatAbilitiesForAnalysis(selected);
 
   return `MODO: ${body.mode}
 INTENSIDAD: ${INTENSITY_GUIDE[body.intensity].label} — ${INTENSITY_GUIDE[body.intensity].style}
@@ -170,10 +181,11 @@ ${(body.researchNotes || "").trim() || "n/a"}
 Claim: ${analysis.claimSummary}
 Tipo: ${analysis.kindLabel}
 Cifras: ${[...analysis.percents, ...analysis.numbers].slice(0, 8).join(", ") || "ninguna"}
+Habilidades sugeridas para este post: ${selectedBlock}
 
 === TAREA ===
 Devuelve JSON con:
-- analysis: 2–4 frases INTERNAS (táctica). El usuario NO pega esto.
+- analysis: 2–5 frases INTERNAS (táctica + habilidades usadas). El usuario NO pega esto.
 - variants: 3 objetos. En cada uno, "text" es un comentario/post listo para COPIAR Y PEGAR:
   * Suena a que el USUARIO lo escribió (primera persona / voz de grupo).
   * Responde al mensaje de arriba como en un grupo de Facebook.

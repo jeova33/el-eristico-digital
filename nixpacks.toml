@@ -1,11 +1,9 @@
 [variables]
 NIXPACKS_NODE_VERSION = "22"
-
-[phases.setup]
-nixPkgs = ["nodejs_22", "npm-10_x"]
+NPM_CONFIG_PRODUCTION = "false"
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm ci --include=dev"]
 
 [phases.build]
 cmds = ["npm run build"]

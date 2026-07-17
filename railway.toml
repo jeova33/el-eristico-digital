@@ -1,14 +1,10 @@
 # Railway — El Erístico Digital (Next.js)
-# https://docs.railway.com
+# Build lo maneja Nixpacks (install + build). No duplicar npm ci.
 
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npm run build"
 
 [deploy]
 startCommand = "npm run start"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
-
-[env]
-NODE_ENV = "production"

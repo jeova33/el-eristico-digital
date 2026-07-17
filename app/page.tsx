@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FOCUS_GUIDE,
   LENGTH_GUIDE,
@@ -80,6 +80,68 @@ export default function Home() {
   const [apiError, setApiError] = useState("");
   /** auto | xai | gemini | nvidia */
   const [llmProvider, setLlmProvider] = useState<"auto" | "xai" | "gemini" | "nvidia">("auto");
+  const [providersOnline, setProvidersOnline] = useState<
+    Array<{ id: string; label: string; configured: boolean; model: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/generate")
+      .then((r) => r.json())
+      .then((j: {
+        providers?: Array<{ id: string; label: string; configured: boolean; model: string }>;
+      }) => {
+        if (!cancelled && Array.isArray(j.providers)) setProvidersOnline(j.providers);
+      })
+      .catch(() => {
+        /* sin server */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const providerCards = useMemo(
+    () =>
+      [
+        {
+          id: "auto" as const,
+          icon: "⚡",
+          label: "Auto",
+          hint: "Primera API con clave",
+        },
+        {
+          id: "xai" as const,
+          icon: "𝕏",
+          label: "Grok",
+          hint: "xAI · combativo",
+        },
+        {
+          id: "gemini" as const,
+          icon: "✦",
+          label: "Gemini",
+          hint: "Google · rápido",
+        },
+        {
+          id: "nvidia" as const,
+          icon: "▲",
+          label: "NVIDIA",
+          hint: "NIM · Llama",
+        },
+      ].map((card) => {
+        if (card.id === "auto") {
+          const anyOn = providersOnline.some((p) => p.configured);
+          return { ...card, configured: anyOn || providersOnline.length === 0, model: "" };
+        }
+        const st = providersOnline.find((p) => p.id === card.id);
+        return {
+          ...card,
+          configured: st ? st.configured : true,
+          model: st?.model || "",
+        };
+      }),
+    [providersOnline],
+  );
 
   const active = useMemo(() => modes.find((item) => item.id === mode)!, [mode]);
   const activeStrats = useMemo(
@@ -550,27 +612,40 @@ export default function Home() {
           </div>
         )}
 
-        <div className="control-block">
-          <strong className="control-label">Motor IA (API)</strong>
+        <div className="control-block who-answers" id="quien-contesta">
+          <strong className="control-label">¿Quién te contesta?</strong>
           <p className="control-hint">
-            Grok (xAI), Gemini (Google) o NVIDIA NIM. Auto = el primero con clave en el servidor.
+            Elige la IA que escribe tu contraataque o post. Puedes cambiarla en cada generación.
           </p>
-          <div className="tone-picker" aria-label="Proveedor LLM">
-            {(
-              [
-                { id: "auto" as const, label: "Auto" },
-                { id: "xai" as const, label: "Grok" },
-                { id: "gemini" as const, label: "Gemini" },
-                { id: "nvidia" as const, label: "NVIDIA" },
-              ] as const
-            ).map((p) => (
+          <div className="who-grid" role="radiogroup" aria-label="Quién te contesta">
+            {providerCards.map((p) => (
               <button
                 key={p.id}
                 type="button"
-                className={llmProvider === p.id ? "active" : ""}
+                role="radio"
+                aria-checked={llmProvider === p.id}
+                className={`who-card ${llmProvider === p.id ? "active" : ""} ${!p.configured ? "offline" : ""}`}
                 onClick={() => setLlmProvider(p.id)}
+                title={
+                  p.configured
+                    ? p.model
+                      ? `${p.label} · ${p.model}`
+                      : p.label
+                    : `${p.label}: sin API key en el servidor`
+                }
               >
-                {p.label}
+                <span className="who-icon" aria-hidden="true">
+                  {p.icon}
+                </span>
+                <span className="who-text">
+                  <b>{p.label}</b>
+                  <small>{p.hint}</small>
+                  {p.configured ? (
+                    <em className="who-status on">Lista</em>
+                  ) : (
+                    <em className="who-status off">Sin key</em>
+                  )}
+                </span>
               </button>
             ))}
           </div>

@@ -7,7 +7,7 @@ import type { Intensity, Mode, ReplyFocus, ReplyLength } from "../eristico-engin
 import type { WriteStyleId } from "../knowledge/styles";
 import { FOCUS_GUIDE, LENGTH_GUIDE } from "../eristico-engine";
 import { INTENSITY_GUIDE } from "../knowledge/persuasion";
-import { WRITE_STYLES } from "../knowledge/styles";
+import { resolveWriteStylePrompt } from "../knowledge/styles";
 import { SYSTEM_PROMPT_CORE } from "../knowledge/persuasion";
 import { analyzeContent } from "../content-analysis";
 import {
@@ -22,6 +22,8 @@ export type GenerateRequestBody = {
   focus: ReplyFocus;
   length: ReplyLength;
   writeStyle?: WriteStyleId;
+  /** Descripción libre del estilo cuando writeStyle === "custom" */
+  writeStyleCustom?: string;
   opponentText: string;
   stanceText?: string;
   postText?: string;
@@ -142,7 +144,7 @@ export function buildUserPrompt(body: GenerateRequestBody): string {
   const post = (body.postText || "").trim();
   const opponent = (body.opponentText || post).trim();
   const analysis = analyzeContent(opponent || post || "");
-  const style = WRITE_STYLES.find((s) => s.id === (body.writeStyle || "eristico"));
+  const style = resolveWriteStylePrompt(body.writeStyle, body.writeStyleCustom);
   const isPro = body.mode === "pro";
   const budget = lengthBudget(body.length);
   const stance = (body.stanceText || "").trim();
@@ -156,7 +158,8 @@ ENFOQUE: ${FOCUS_GUIDE[body.focus].label} — ${FOCUS_GUIDE[body.focus].style}
 LARGO: ${LENGTH_GUIDE[body.length].label}
 PRESUPUESTO: ${budget.hint}
   → Mínimo ${budget.minSentences} oraciones y ${budget.minChars} caracteres en CADA variants[].text
-ESTILO: ${style?.label || "Humano"} — ${(style?.rules || []).join(" ")}
+ESTILO: ${style.label}
+${style.rulesText}
 
 === POST O COMENTARIO AL QUE RESPONDES (texto real del hilo) ===
 ${opponent || "(vacío)"}

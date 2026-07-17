@@ -237,6 +237,7 @@ function localFallback(body: GenerateRequestBody) {
       focus: body.focus,
       length: body.length,
       writeStyle: body.writeStyle,
+      writeStyleCustom: body.writeStyleCustom,
       research,
       seed: body.seed,
     });

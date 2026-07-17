@@ -78,9 +78,65 @@ export const WRITE_STYLES: WriteStyle[] = [
       "Frases enteras. Nunca 'c…' cortado.",
     ],
   },
+  {
+    id: "libre",
+    label: "Libre",
+    hint: "La IA elige el tono",
+    rules: [
+      "TÚ decides el estilo de escritura que más gana este hilo concreto.",
+      "Puedes mezclar calle, datos, narrativa o erística según el post rival.",
+      "Prioriza sonar humano, pegajoso y creíble en el feed. Cero plantilla IA.",
+      "Frases completas. Sin meta-comentario de 'elegí el estilo X'.",
+    ],
+  },
+  {
+    id: "custom",
+    label: "A tu medida",
+    hint: "Escribes tú el estilo",
+    rules: [
+      "Sigue EXACTAMENTE el estilo personalizado que escribe el usuario abajo.",
+      "Si el estilo del usuario choca con alguna convención genérica, gana el del usuario.",
+      "Frases completas. Voz humana. Sin sonar a plantilla.",
+    ],
+  },
 ];
 
 export type WriteStyleId = (typeof WRITE_STYLES)[number]["id"];
+
+const MAX_CUSTOM_STYLE_CHARS = 2000;
+
+/** Resuelve instrucciones de estilo (incluye libre + texto custom del usuario). */
+export function resolveWriteStylePrompt(
+  styleId: WriteStyleId | string | undefined,
+  customStyle?: string,
+): { id: string; label: string; rulesText: string } {
+  const id = (styleId || "eristico") as WriteStyleId;
+  const meta = WRITE_STYLES.find((s) => s.id === id) ?? WRITE_STYLES.find((s) => s.id === "eristico")!;
+  const custom = (customStyle || "").trim().slice(0, MAX_CUSTOM_STYLE_CHARS);
+
+  if (id === "custom") {
+    const rulesText = custom
+      ? `ESTILO PERSONALIZADO DEL USUARIO (obligatorio):\n${custom}\nAdemás: ${(meta.rules || []).join(" ")}`
+      : `El usuario eligió "A tu medida" pero no escribió estilo: elige el tono más humano y efectivo para el hilo. ${(meta.rules || []).join(" ")}`;
+    return { id: meta.id, label: meta.label, rulesText };
+  }
+
+  if (id === "libre") {
+    return {
+      id: meta.id,
+      label: meta.label,
+      rulesText: `ESTILO LIBRE: la IA elige y mezcla el tono óptimo para este post/comentario. ${(meta.rules || []).join(" ")}`,
+    };
+  }
+
+  return {
+    id: meta.id,
+    label: meta.label,
+    rulesText: `${meta.label} — ${(meta.rules || []).join(" ")}`,
+  };
+}
+
+export { MAX_CUSTOM_STYLE_CHARS };
 
 /** Limpia salidas: sin ellipsis de truncado, sin cortes feos, sin censura blanda */
 export function polishComplete(text: string): string {

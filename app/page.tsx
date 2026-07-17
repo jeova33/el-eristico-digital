@@ -13,7 +13,11 @@ import {
 } from "../lib/eristico-engine";
 import type { CouncilResult } from "../lib/agents/council";
 import type { ResearchPack } from "../lib/research/person-research";
-import { WRITE_STYLES, type WriteStyleId } from "../lib/knowledge/styles";
+import {
+  MAX_CUSTOM_STYLE_CHARS,
+  WRITE_STYLES,
+  type WriteStyleId,
+} from "../lib/knowledge/styles";
 import { PRIMARY_ARSENAL, STRATAGEMS } from "../lib/knowledge/stratagemas";
 import { ABILITIES, ABILITY_CATEGORIES, abilitiesByTag } from "../lib/knowledge/abilities";
 
@@ -57,6 +61,7 @@ export default function Home() {
   const [focus, setFocus] = useState<ReplyFocus>("publico");
   const [length, setLength] = useState<ReplyLength>("media");
   const [writeStyle, setWriteStyle] = useState<WriteStyleId>("eristico");
+  const [writeStyleCustom, setWriteStyleCustom] = useState("");
 
   const [opponentText, setOpponentText] = useState("");
   const [stanceText, setStanceText] = useState("");
@@ -243,6 +248,8 @@ export default function Home() {
           focus,
           length,
           writeStyle,
+          writeStyleCustom:
+            writeStyle === "custom" ? writeStyleCustom.trim() || undefined : undefined,
           opponentText: attackSource,
           postText: isPro ? postText || attackSource : undefined,
           stanceText,
@@ -684,13 +691,16 @@ export default function Home() {
 
         <div className="control-block">
           <strong className="control-label">Estilo de escritura</strong>
-          <p className="control-hint">Skills: calle, humano anti-IA, narrativo, erístico, filosófico crudo, datos.</p>
+          <p className="control-hint">
+            Skills: calle, humano anti-IA, narrativo, erístico, filosófico crudo, datos,{" "}
+            <b>libre (la IA decide)</b> o <b>a tu medida</b> (escribes el estilo).
+          </p>
           <div className="style-row">
             {WRITE_STYLES.map((st) => (
               <button
                 key={st.id}
                 type="button"
-                className={`style-chip ${writeStyle === st.id ? "active" : ""}`}
+                className={`style-chip ${writeStyle === st.id ? "active" : ""} ${st.id === "libre" || st.id === "custom" ? "style-chip-special" : ""}`}
                 onClick={() => setWriteStyle(st.id)}
               >
                 <b>{st.label}</b>
@@ -698,6 +708,29 @@ export default function Home() {
               </button>
             ))}
           </div>
+          {writeStyle === "libre" && (
+            <p className="control-hint style-extra-hint">
+              La IA elige el tono (o mezcla) que más gane este hilo: calle, datos, narrativa, etc.
+              No hace falta que lo describas.
+            </p>
+          )}
+          {writeStyle === "custom" && (
+            <label className="text-box style-custom-box">
+              <span>Describe el estilo de escritura que quieres</span>
+              <textarea
+                value={writeStyleCustom}
+                onChange={(e) =>
+                  setWriteStyleCustom(e.target.value.slice(0, MAX_CUSTOM_STYLE_CHARS))
+                }
+                placeholder='Ej: "Como abuelo de pueblo, irónico, con refranes, sin groserías, corto y con pregunta final."'
+                rows={3}
+              />
+              <span className="text-footer">
+                <span>Tu estilo</span>
+                {writeStyleCustom.length}/{MAX_CUSTOM_STYLE_CHARS}
+              </span>
+            </label>
+          )}
         </div>
 
         <div className="control-block">

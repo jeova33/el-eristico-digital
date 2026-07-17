@@ -6,7 +6,12 @@
 import { runCouncil, type CouncilResult } from "./agents/council";
 import type { ResearchPack } from "./research/person-research";
 import { buildResearchQueries, buildSearchLinks, deriveAngles } from "./research/person-research";
-import { polishComplete, softClipComplete, type WriteStyleId, WRITE_STYLES } from "./knowledge/styles";
+import {
+  polishComplete,
+  softClipComplete,
+  type WriteStyleId,
+  resolveWriteStylePrompt,
+} from "./knowledge/styles";
 import { generateEristic, type Intensity, type ReplyFocus, type ReplyLength, type ReplyVariant } from "./eristico-engine";
 
 export type ProInput = {
@@ -24,6 +29,7 @@ export type ProInput = {
   focus?: ReplyFocus;
   length?: ReplyLength;
   writeStyle?: WriteStyleId;
+  writeStyleCustom?: string;
   research?: ResearchPack | null;
   seed?: number;
 };
@@ -144,10 +150,10 @@ export function generatePro(input: ProInput): ProOutput {
     })),
   ];
 
-  const styleMeta = WRITE_STYLES.find((s) => s.id === styleId);
+  const styleMeta = resolveWriteStylePrompt(styleId, input.writeStyleCustom);
   const analysis = polishComplete(
     [
-      `Modo PRO. Estilo: ${styleMeta?.label ?? styleId}. Intensidad: ${intensity}.`,
+      `Modo PRO. Estilo: ${styleMeta.label}${styleId === "custom" && input.writeStyleCustom ? " (personalizado)" : styleId === "libre" ? " (IA decide)" : ""}. Intensidad: ${intensity}.`,
       `Personaje: ${input.personName || "sin nombre"} · ${input.personRole || "sin rol"}.`,
       `Narrativa a imponer: ${narrative || "no declarada"}.`,
       `Intel: ${research.notes.slice(0, 280)}.`,

@@ -488,6 +488,19 @@ main {
 .style-chip.active b {
   color: var(--yellow);
 }
+.style-chip-special {
+  border-style: dashed;
+}
+.style-chip-special.active {
+  border-style: solid;
+}
+.style-extra-hint {
+  margin-top: 10px;
+}
+.style-custom-box {
+  margin-top: 12px;
+  display: block;
+}
 .agent-grid {
   display: grid;
   grid-template-columns: 1fr;

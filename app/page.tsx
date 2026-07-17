@@ -42,6 +42,10 @@ const lengths: Array<{ id: ReplyLength; icon: string }> = [
   { id: "larga", icon: "•••" },
 ];
 
+/** Límite de caracteres: comentario/post del oponente y postura/órdenes */
+const MAX_OPPONENT_CHARS = 10_000;
+const MAX_STANCE_CHARS = 10_000;
+
 export default function Home() {
   const [mode, setMode] = useState<Mode>("contraataque");
   const [intensity, setIntensity] = useState<Intensity>("viral");
@@ -487,16 +491,18 @@ export default function Home() {
 
             <div className="input-grid split">
               <label className="text-box">
-                <span>Comentario enemigo (si es un reply)</span>
+                <span>Comentario o post enemigo (si es un reply)</span>
                 <textarea
                   value={opponentText}
-                  onChange={(e) => setOpponentText(e.target.value.slice(0, 1200))}
-                  placeholder="Si te atacan en un comentario, pégalo aquí completo."
+                  onChange={(e) =>
+                    setOpponentText(e.target.value.slice(0, MAX_OPPONENT_CHARS))
+                  }
+                  placeholder="Si te atacan en un comentario o post, pégalo aquí completo."
                   rows={4}
                 />
                 <span className="text-footer">
                   <span>Ataque</span>
-                  {opponentText.length}/1200
+                  {opponentText.length}/{MAX_OPPONENT_CHARS}
                 </span>
               </label>
               <label className="text-box">
@@ -564,31 +570,35 @@ export default function Home() {
             <label className="text-box">
               <span>
                 {mode === "desmontar"
-                  ? "Pega el comentario del oponente (lo disecciono)"
-                  : "Comentario del oponente"}
+                  ? "Pega el comentario o post del oponente (lo disecciono)"
+                  : "Comentario o post del oponente"}
               </span>
               <textarea
                 value={opponentText}
-                onChange={(event) => setOpponentText(event.target.value.slice(0, 1200))}
-                placeholder="Pega el texto completo. No cortes a mitad de frase."
+                onChange={(event) =>
+                  setOpponentText(event.target.value.slice(0, MAX_OPPONENT_CHARS))
+                }
+                placeholder="Pega el comentario o post completo. No cortes a mitad de frase."
                 rows={5}
               />
               <span className="text-footer">
                 <span>f&nbsp;&nbsp;𝕏</span>
-                {opponentText.length}/1200
+                {opponentText.length}/{MAX_OPPONENT_CHARS}
               </span>
             </label>
             <label className="text-box">
               <span>Mi postura + órdenes (se cumplen en cada variante)</span>
               <textarea
                 value={stanceText}
-                onChange={(event) => setStanceText(event.target.value.slice(0, 1200))}
+                onChange={(event) =>
+                  setStanceText(event.target.value.slice(0, MAX_STANCE_CHARS))
+                }
                 placeholder='Ej: "Ten criterio, cátedra de datos y termina con frases bíblicas."'
                 rows={5}
               />
               <span className="text-footer">
                 <span>Órdenes al motor</span>
-                {stanceText.length}/1200
+                {stanceText.length}/{MAX_STANCE_CHARS}
               </span>
             </label>
           </div>
@@ -600,13 +610,15 @@ export default function Home() {
               <span>Mi postura + órdenes de entrega (obligatorias en cada variante)</span>
               <textarea
                 value={stanceText}
-                onChange={(event) => setStanceText(event.target.value.slice(0, 1200))}
+                onChange={(event) =>
+                  setStanceText(event.target.value.slice(0, MAX_STANCE_CHARS))
+                }
                 placeholder='Ej: "Criterio firme, cátedra de datos y termina con frases bíblicas."'
                 rows={3}
               />
               <span className="text-footer">
                 <span>Órdenes al motor</span>
-                {stanceText.length}/1200
+                {stanceText.length}/{MAX_STANCE_CHARS}
               </span>
             </label>
           </div>

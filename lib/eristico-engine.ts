@@ -478,7 +478,7 @@ export function generateEristic(input: EngineInput): EngineOutput {
 
   if (!opponent) {
     const msg =
-      "Pega el comentario del oponente (y tu postura si puedes). Sin blanco no hay misil.";
+      "Pega el comentario o post del oponente (y tu postura si puedes). Sin blanco no hay misil.";
     const emptyBrowser: DebateBrowser = {
       attackProfile: "Sin texto",
       plainSummary: "Aún no hay ataque que analizar.",
@@ -511,7 +511,7 @@ export function generateEristic(input: EngineInput): EngineOutput {
                 `• Posible E${s.id} (${s.digitalName}): ${s.summary} → contra en simple: ${s.digitalUse}`,
             )
             .join("\n");
-          return `Lectura del comentario enemigo:\n${lines}\n\n${buildAnalysis(stratagems, intensity, input.mode, focus, length)}`;
+          return `Lectura del comentario o post enemigo:\n${lines}\n\n${buildAnalysis(stratagems, intensity, input.mode, focus, length)}`;
         })()
       : buildAnalysis(stratagems, intensity, input.mode, focus, length);
 

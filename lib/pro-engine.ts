@@ -12,7 +12,7 @@ import { generateEristic, type Intensity, type ReplyFocus, type ReplyLength, typ
 export type ProInput = {
   /** Texto del post o comentario enemigo */
   postText: string;
-  /** Comentario del oponente (si difiere del post) */
+  /** Comentario o post del oponente (si difiere del post principal) */
   opponentComment?: string;
   stanceText: string;
   personName?: string;
@@ -97,7 +97,7 @@ export function generatePro(input: ProInput): ProOutput {
   };
 
   const council = runCouncil({
-    opponentText: opponent || post || "comentario vacío",
+    opponentText: opponent || post || "comentario o post vacío",
     stanceText: stance,
     personName: input.personName,
     personRole: input.personRole,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   anyLlmConfigured,
+  getProviderApiKey,
   llmChat,
   providerLabel,
   providersStatus,
@@ -10,6 +11,7 @@ import {
 import {
   buildSystemPrompt,
   buildUserPrompt,
+  lengthBudget,
   parseGrokJson,
   type GenerateRequestBody,
 } from "../../../lib/xai/prompts";
@@ -18,19 +20,19 @@ import { generatePro } from "../../../lib/pro-engine";
 import type { ResearchPack } from "../../../lib/research/person-research";
 
 export const runtime = "nodejs";
-export const maxDuration = 90;
+export const maxDuration = 120;
 
 type BodyWithProvider = GenerateRequestBody & {
-  /** xai | gemini | nvidia — opcional; si no, LLM_PROVIDER o primer key disponible */
   provider?: LlmProviderId | string;
 };
 
 export async function GET() {
   const active = resolveProvider();
+  const configured = anyLlmConfigured();
   return NextResponse.json({
     ok: true,
-    activeProvider: active,
-    activeLabel: active ? providerLabel(active) : null,
+    activeProvider: configured ? active : null,
+    activeLabel: configured && active ? providerLabel(active) : null,
     providers: providersStatus(),
   });
 }
@@ -51,24 +53,76 @@ export async function POST(req: Request) {
     );
   }
 
-  const provider = resolveProvider(body.provider);
-  const hasLlm = anyLlmConfigured() && Boolean(provider);
+  const forced =
+    body.provider && body.provider !== "auto" && body.provider in { xai: 1, gemini: 1, nvidia: 1 }
+      ? (body.provider as LlmProviderId)
+      : undefined;
 
-  // —— LLM (Grok / Gemini / NVIDIA) ——
+  // Usuario eligió un motor sin key → error claro, NO local silencioso
+  if (forced && !getProviderApiKey(forced)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `${providerLabel(forced)} no tiene API key en el servidor. Configura la variable en Railway o elige Auto/otro motor.`,
+        provider: forced,
+        providers: providersStatus(),
+      },
+      { status: 400 },
+    );
+  }
+
+  const provider = resolveProvider(forced);
+  const hasLlm = Boolean(provider && getProviderApiKey(provider));
+  const budget = lengthBudget(body.length || "media");
+
   if (hasLlm && provider) {
     try {
       const result = await llmChat({
         provider,
+        jsonMode: true,
         messages: [
           { role: "system", content: buildSystemPrompt() },
           { role: "user", content: buildUserPrompt(body) },
         ],
         temperature:
-          body.intensity === "cirujano" ? 0.5 : body.intensity === "devastador" ? 0.85 : 0.7,
-        maxTokens: body.length === "larga" ? 2800 : body.length === "corta" ? 1200 : 2000,
+          body.intensity === "cirujano" ? 0.45 : body.intensity === "devastador" ? 0.8 : 0.65,
+        maxTokens: budget.maxTokens,
       });
 
-      const parsed = parseGrokJson(result.content);
+      let parsed = parseGrokJson(result.content);
+
+      // Si es "larga" y salió corto, un refuerzo pidiendo ampliar (1 sola vez)
+      if (
+        parsed &&
+        body.length === "larga" &&
+        parsed.variants.some((v) => v.text.length < budget.minChars)
+      ) {
+        const shortOnes = parsed.variants
+          .map((v, i) => `${i + 1}: ${v.text.length} chars`)
+          .join(", ");
+        const expand = await llmChat({
+          provider,
+          jsonMode: true,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Amplía cada variants[].text al mínimo pedido. Cumple las ÓRDENES DEL USUARIO. Solo JSON.",
+            },
+            {
+              role: "user",
+              content: `Las variantes salieron cortas (${shortOnes}). Mínimo ${budget.minChars} caracteres y ${budget.minSentences} oraciones CADA una.
+Órdenes del usuario (obligatorias): ${(body.stanceText || "").trim() || "n/a"}
+JSON previo a ampliar:\n${JSON.stringify(parsed).slice(0, 12000)}`,
+            },
+          ],
+          temperature: 0.5,
+          maxTokens: budget.maxTokens,
+        });
+        const expanded = parseGrokJson(expand.content);
+        if (expanded) parsed = expanded;
+      }
+
       if (parsed) {
         parsed.model = result.model;
         return NextResponse.json({
@@ -82,22 +136,23 @@ export async function POST(req: Request) {
         });
       }
 
-      // Reintento barato: solo JSON
       const retry = await llmChat({
         provider,
+        jsonMode: true,
         messages: [
           {
             role: "system",
             content:
-              "Devuelve ÚNICAMENTE JSON válido del esquema (analysis, variants[3], etc.). Sin markdown. Sin explicación.",
+              "Devuelve ÚNICAMENTE JSON válido (analysis, variants con 3 text largos, etc.). Sin markdown.",
           },
           {
             role: "user",
-            content: `Convierte a JSON del esquema de variantes. Contenido previo:\n${result.content.slice(0, 4000)}`,
+            content: `Convierte a JSON del esquema. Cumple órdenes: ${(body.stanceText || "").slice(0, 400)}
+Largo: ${body.length}. Contenido previo:\n${result.content.slice(0, 8000)}`,
           },
         ],
         temperature: 0.15,
-        maxTokens: 1800,
+        maxTokens: budget.retryMaxTokens,
       });
       const parsed2 = parseGrokJson(retry.content);
       if (parsed2) {
@@ -116,14 +171,26 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: `${providerLabel(provider)} respondió pero no en JSON usable. Reintenta o cambia de proveedor.`,
+          error: `${providerLabel(provider)} respondió pero no en JSON usable. Reintenta o cambia de motor.`,
           provider,
-          rawPreview: result.content.slice(0, 400),
+          rawPreview: result.content.slice(0, 500),
         },
         { status: 502 },
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "error_llm";
+      // Si el usuario forzó un proveedor, NO enmascarar con local
+      if (forced) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: message,
+            provider: forced,
+            providers: providersStatus(),
+          },
+          { status: 502 },
+        );
+      }
       const fallback = localFallback(body);
       return NextResponse.json({
         ok: true,
@@ -135,14 +202,13 @@ export async function POST(req: Request) {
     }
   }
 
-  // —— Sin ninguna API key ——
   const fallback = localFallback(body);
   return NextResponse.json({
     ok: true,
     source: "local" as const,
     provider: "local",
     warning:
-      "Sin API keys. Configura XAI_API_KEY y/o GEMINI_API_KEY y/o NVIDIA_API_KEY (y opcional LLM_PROVIDER=xai|gemini|nvidia).",
+      "Sin API keys. Configura XAI_API_KEY y/o GEMINI_API_KEY y/o NVIDIA_API_KEY en Railway.",
     providers: providersStatus(),
     data: fallback,
   });

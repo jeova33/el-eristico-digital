@@ -597,16 +597,16 @@ export default function Home() {
         {isPro && (
           <div className="input-grid" style={{ marginTop: 14 }}>
             <label className="text-box">
-              <span>Tu postura (qué quieres que gane en el hilo)</span>
+              <span>Mi postura + órdenes de entrega (obligatorias en cada variante)</span>
               <textarea
                 value={stanceText}
-                onChange={(event) => setStanceText(event.target.value.slice(0, 800))}
-                placeholder="La posición que debe quedar en pie frente a la audiencia."
+                onChange={(event) => setStanceText(event.target.value.slice(0, 1200))}
+                placeholder='Ej: "Criterio firme, cátedra de datos y termina con frases bíblicas."'
                 rows={3}
               />
               <span className="text-footer">
-                <span>Postura</span>
-                {stanceText.length}/800
+                <span>Órdenes al motor</span>
+                {stanceText.length}/1200
               </span>
             </label>
           </div>

@@ -1,6 +1,6 @@
 /**
  * Multi-proveedor LLM: Grok (xAI) · Gemini (Google) · NVIDIA NIM
- * Claves solo en servidor. OpenAI-compatible donde aplica.
+ * Gemini usa API nativa por defecto (más estable que el bridge OpenAI).
  */
 
 export type LlmProviderId = "xai" | "gemini" | "nvidia";
@@ -26,8 +26,9 @@ export type LlmChatOpts = {
   model?: string;
   temperature?: number;
   maxTokens?: number;
-  /** Fuerza un proveedor; si no, usa LLM_PROVIDER o el primero con clave */
   provider?: LlmProviderId;
+  /** Pedir JSON (Gemini nativo lo soporta bien) */
+  jsonMode?: boolean;
 };
 
 const PROVIDER_META: Record<
@@ -37,7 +38,6 @@ const PROVIDER_META: Record<
     envKey: string;
     envModel: string;
     defaultModel: string;
-    /** Base OpenAI-compatible; vacío = API nativa Gemini */
     baseUrl: string;
   }
 > = {
@@ -52,8 +52,8 @@ const PROVIDER_META: Record<
     label: "Gemini (Google)",
     envKey: "GEMINI_API_KEY",
     envModel: "GEMINI_MODEL",
-    // OpenAI-compatible endpoint de Google AI
-    defaultModel: "gemini-2.5-flash",
+    // Modelos estables en AI Studio / v1beta
+    defaultModel: "gemini-2.0-flash",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
   },
   nvidia: {
@@ -64,6 +64,16 @@ const PROVIDER_META: Record<
     baseUrl: "https://integrate.api.nvidia.com/v1",
   },
 };
+
+/** Alternativas si el modelo default falla en Gemini */
+const GEMINI_MODEL_FALLBACKS = [
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-001",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-latest",
+  "gemini-1.5-pro",
+  "gemini-flash-latest",
+];
 
 function env(name: string): string | null {
   const v = process.env[name]?.trim();
@@ -80,13 +90,14 @@ export function listConfiguredProviders(): LlmProviderId[] {
   );
 }
 
-/** Orden de preferencia si no hay LLM_PROVIDER */
 const FALLBACK_ORDER: LlmProviderId[] = ["xai", "gemini", "nvidia"];
 
 export function resolveProvider(forced?: LlmProviderId | string | null): LlmProviderId | null {
   if (forced && forced in PROVIDER_META) {
     const id = forced as LlmProviderId;
-    if (getProviderApiKey(id)) return id;
+    // Si el usuario fuerza un proveedor sin key, devolvemos el id igual
+    // (el caller debe chequear la key y dar error claro)
+    return id;
   }
   const preferred = (process.env.LLM_PROVIDER || "").trim().toLowerCase() as LlmProviderId;
   if (preferred && preferred in PROVIDER_META && getProviderApiKey(preferred)) {
@@ -113,7 +124,9 @@ async function openAiCompatibleChat(
   const meta = PROVIDER_META[id];
   const apiKey = getProviderApiKey(id);
   if (!apiKey) {
-    throw new Error(`${meta.envKey} no configurada. Añádela en .env.local o Railway Variables.`);
+    throw new Error(
+      `${meta.envKey} no configurada. Añádela en Railway Variables o .env.local para usar ${meta.label}.`,
+    );
   }
 
   const model = opts.model || defaultModel(id);
@@ -123,13 +136,9 @@ async function openAiCompatibleChat(
     model,
     messages: opts.messages,
     temperature: opts.temperature ?? 0.75,
-    max_tokens: opts.maxTokens ?? 2048,
+    max_tokens: opts.maxTokens ?? 4096,
   };
-
-  // NVIDIA a veces prefiere stream:false explícito
-  if (id === "nvidia") {
-    body.stream = false;
-  }
+  if (id === "nvidia") body.stream = false;
 
   const res = await fetch(url, {
     method: "POST",
@@ -143,7 +152,7 @@ async function openAiCompatibleChat(
 
   const raw = await res.text();
   if (!res.ok) {
-    let detail = raw.slice(0, 500);
+    let detail = raw.slice(0, 600);
     try {
       const j = JSON.parse(raw) as {
         error?: { message?: string } | string;
@@ -160,7 +169,9 @@ async function openAiCompatibleChat(
 
   const data = JSON.parse(raw) as {
     model?: string;
-    choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
+    choices?: Array<{
+      message?: { content?: string | Array<{ type?: string; text?: string }> };
+    }>;
     usage?: LlmChatResult["usage"];
   };
 
@@ -184,15 +195,11 @@ async function openAiCompatibleChat(
   };
 }
 
-/**
- * Gemini nativo (fallback si el endpoint OpenAI-compatible falla).
- * https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
- */
-async function geminiNativeChat(opts: LlmChatOpts): Promise<LlmChatResult> {
-  const apiKey = getProviderApiKey("gemini");
-  if (!apiKey) throw new Error("GEMINI_API_KEY no configurada.");
-
-  const model = opts.model || defaultModel("gemini");
+async function geminiNativeOnce(
+  model: string,
+  opts: LlmChatOpts,
+  apiKey: string,
+): Promise<LlmChatResult> {
   const systemParts = opts.messages
     .filter((m) => m.role === "system")
     .map((m) => m.content)
@@ -206,42 +213,55 @@ async function geminiNativeChat(opts: LlmChatOpts): Promise<LlmChatResult> {
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+  const maxOut = Math.min(Math.max(opts.maxTokens ?? 4096, 1024), 8192);
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      systemInstruction: systemParts
-        ? { parts: [{ text: systemParts }] }
-        : undefined,
+      ...(systemParts
+        ? { systemInstruction: { parts: [{ text: systemParts }] } }
+        : {}),
       contents,
       generationConfig: {
-        temperature: opts.temperature ?? 0.75,
-        maxOutputTokens: opts.maxTokens ?? 2048,
-        responseMimeType: "application/json",
+        temperature: opts.temperature ?? 0.7,
+        maxOutputTokens: maxOut,
+        // JSON ayuda al parseo de variantes
+        ...(opts.jsonMode !== false
+          ? { responseMimeType: "application/json" }
+          : {}),
       },
     }),
   });
 
   const raw = await res.text();
   if (!res.ok) {
-    let detail = raw.slice(0, 500);
+    let detail = raw.slice(0, 600);
     try {
-      const j = JSON.parse(raw) as { error?: { message?: string } };
+      const j = JSON.parse(raw) as { error?: { message?: string; status?: string } };
       detail = j.error?.message || detail;
     } catch {
       /* keep */
     }
-    throw new Error(`Gemini native ${res.status}: ${detail}`);
+    throw new Error(`Gemini ${res.status} (${model}): ${detail}`);
   }
 
   const data = JSON.parse(raw) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      finishReason?: string;
+    }>;
     usageMetadata?: {
       promptTokenCount?: number;
       candidatesTokenCount?: number;
       totalTokenCount?: number;
     };
+    error?: { message?: string };
   };
+
+  if (data.error?.message) {
+    throw new Error(`Gemini (${model}): ${data.error.message}`);
+  }
 
   const content =
     data.candidates?.[0]?.content?.parts
@@ -249,7 +269,10 @@ async function geminiNativeChat(opts: LlmChatOpts): Promise<LlmChatResult> {
       .join("")
       .trim() || "";
 
-  if (!content) throw new Error("Gemini nativo devolvió respuesta vacía");
+  if (!content) {
+    const reason = data.candidates?.[0]?.finishReason || "vacío";
+    throw new Error(`Gemini (${model}) sin texto (finishReason=${reason})`);
+  }
 
   return {
     content,
@@ -263,37 +286,64 @@ async function geminiNativeChat(opts: LlmChatOpts): Promise<LlmChatResult> {
   };
 }
 
-/** Chat unificado: resuelve proveedor y llama */
+/** Gemini: nativo con fallback de modelos */
+async function geminiChat(opts: LlmChatOpts): Promise<LlmChatResult> {
+  const apiKey = getProviderApiKey("gemini");
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY no configurada. Crea una en https://aistudio.google.com/apikey y ponla en Railway.",
+    );
+  }
+
+  const preferred = opts.model || defaultModel("gemini");
+  const tryModels = [preferred, ...GEMINI_MODEL_FALLBACKS.filter((m) => m !== preferred)];
+
+  let lastErr: Error | null = null;
+  for (const model of tryModels) {
+    try {
+      return await geminiNativeOnce(model, opts, apiKey);
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      // Si es modelo no encontrado, prueba el siguiente; si es API key inválida, no sigas
+      if (/API_KEY|PERMISSION|401|403|invalid/i.test(lastErr.message)) break;
+    }
+  }
+
+  // Último intento: OpenAI-compat
+  try {
+    return await openAiCompatibleChat("gemini", opts);
+  } catch (e) {
+    const compat = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      lastErr
+        ? `${lastErr.message} | OpenAI-compat: ${compat}`
+        : compat,
+    );
+  }
+}
+
 export async function llmChat(opts: LlmChatOpts): Promise<LlmChatResult> {
   const provider = resolveProvider(opts.provider);
   if (!provider) {
     throw new Error(
-      "Ninguna API key configurada. Define al menos una: XAI_API_KEY, GEMINI_API_KEY o NVIDIA_API_KEY.",
+      "Ninguna API key. Define XAI_API_KEY y/o GEMINI_API_KEY y/o NVIDIA_API_KEY.",
+    );
+  }
+
+  if (opts.provider && opts.provider in PROVIDER_META && !getProviderApiKey(opts.provider as LlmProviderId)) {
+    const id = opts.provider as LlmProviderId;
+    throw new Error(
+      `${PROVIDER_META[id].envKey} no está en el servidor. Elige otro motor o configura la key en Railway.`,
     );
   }
 
   if (provider === "gemini") {
-    try {
-      return await openAiCompatibleChat("gemini", opts);
-    } catch (err) {
-      // Fallback a API nativa de Gemini
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/404|401|403|not found|unsupported/i.test(msg)) {
-        return geminiNativeChat(opts);
-      }
-      // Si el OpenAI-compat falla por otra razón, aún intentamos nativo
-      try {
-        return await geminiNativeChat(opts);
-      } catch {
-        throw err;
-      }
-    }
+    return geminiChat(opts);
   }
 
   return openAiCompatibleChat(provider, opts);
 }
 
-/** Compat: alias histórico */
 export async function xaiChatCompletions(opts: {
   messages: ChatMessage[];
   model?: string;
@@ -308,7 +358,7 @@ export function getXaiApiKey(): string | null {
 }
 
 export function anyLlmConfigured(): boolean {
-  return resolveProvider() !== null;
+  return listConfiguredProviders().length > 0;
 }
 
 export function providersStatus(): Array<{

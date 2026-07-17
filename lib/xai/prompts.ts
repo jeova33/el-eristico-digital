@@ -7,9 +7,9 @@ import type { Intensity, Mode, ReplyFocus, ReplyLength } from "../eristico-engin
 import type { WriteStyleId } from "../knowledge/styles";
 import { LENGTH_GUIDE, resolveFocusPrompt } from "../eristico-engine";
 import {
-  detectIrreverentRequest,
   GROK_IRREVERENTE_ACTIVE_BLOCK,
   INTENSITY_GUIDE,
+  isIrreverentMode,
   SYSTEM_PROMPT_CORE,
 } from "../knowledge/persuasion";
 import { resolveWriteStylePrompt } from "../knowledge/styles";
@@ -30,6 +30,8 @@ export type GenerateRequestBody = {
   writeStyleCustom?: string;
   /** Descripción libre del tipo de respuesta cuando focus === "custom" */
   focusCustom?: string;
+  /** Chip UI: forzar modo Grok irreverente */
+  irreverent?: boolean;
   opponentText: string;
   stanceText?: string;
   postText?: string;
@@ -133,7 +135,8 @@ export function sanitizePublishableText(raw: string): string {
 
 export function buildSystemPrompt(body?: GenerateRequestBody): string {
   const irreverent = body
-    ? detectIrreverentRequest(
+    ? isIrreverentMode(
+        body.irreverent,
         body.stanceText,
         body.writeStyleCustom,
         body.focusCustom,
@@ -151,7 +154,7 @@ ${abilitiesDigestForPrompt(20)}
 REGLAS DE SALIDA JSON:
 1. variants[].text = ÚNICAMENTE el texto que el usuario pega en el grupo. Voz humana. Sin meta.
 2. analysis = panel interno: di qué habilidades/tácticas usaste (ids o nombres). Si modo irreverente, anótalo.
-3. Cumple ÓRDENES DEL USUARIO dentro del texto publicable (incl. groserías solo si las pidió).
+3. Cumple ÓRDENES DEL USUARIO dentro del texto publicable (incl. groserías solo si las pidió o chip ON).
 4. Responde al claim REAL del post. Argumento lógico siempre. Citas solo oraciones completas si citas.
 5. JSON puro, sin markdown.
 6. abilityIds: array opcional de ids del arsenal que aplicaste (ej. ["amplify","burden","hook"]).`;
@@ -169,13 +172,19 @@ export function buildUserPrompt(body: GenerateRequestBody): string {
   const narrative = (body.narrativeIntent || "").trim();
   const selected = selectAbilitiesForText(opponent || post || "", 8);
   const selectedBlock = formatAbilitiesForAnalysis(selected);
-  const irreverent = detectIrreverentRequest(
+  const irreverent = isIrreverentMode(
+    body.irreverent,
     stance,
     body.writeStyleCustom,
     body.focusCustom,
     narrative,
     body.personContext,
   );
+  const irreverentWhy = body.irreverent
+    ? "chip UI ON"
+    : irreverent
+      ? "detectado en órdenes/estilo/tipo"
+      : "off";
 
   return `MODO: ${body.mode}
 INTENSIDAD: ${INTENSITY_GUIDE[body.intensity].label} — ${INTENSITY_GUIDE[body.intensity].style}
@@ -186,7 +195,7 @@ PRESUPUESTO: ${budget.hint}
   → Mínimo ${budget.minSentences} oraciones y ${budget.minChars} caracteres en CADA variants[].text
 ESTILO: ${style.label}
 ${style.rulesText}
-GROK IRREVERENTE: ${irreverent ? "ON (usuario pidió groserías / tono subido)" : "OFF (firme sin lenguaje altamente profano)"}
+GROK IRREVERENTE: ${irreverent ? `ON (${irreverentWhy})` : "OFF (firme sin lenguaje altamente profano)"}
 
 ${irreverent ? `${GROK_IRREVERENTE_ACTIVE_BLOCK}\n` : ""}
 === POST O COMENTARIO AL QUE RESPONDES (texto real del hilo) ===

@@ -138,6 +138,14 @@ export function detectIrreverentRequest(...chunks: Array<string | undefined | nu
   return IRREVERENT_SIGNAL.test(blob);
 }
 
+/** Chip UI ON o señales en texto del usuario. */
+export function isIrreverentMode(
+  chipOn: boolean | undefined,
+  ...chunks: Array<string | undefined | null>
+): boolean {
+  return Boolean(chipOn) || detectIrreverentRequest(...chunks);
+}
+
 /** Bloque extra cuando el modo irreverente está ON (refuerzo en user prompt). */
 export const GROK_IRREVERENTE_ACTIVE_BLOCK = `=== MODO GROK IRREVERENTE: ACTIVADO (pedido explícito del usuario) ===
 OBLIGATORIO en variants[].text:

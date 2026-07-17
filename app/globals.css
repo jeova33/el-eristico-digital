@@ -704,6 +704,54 @@ main {
 .chip-special.active {
   border-style: solid;
 }
+.irreverent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.irreverent-chip {
+  border: 2px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 140px;
+  transition: 0.18s ease;
+}
+.irreverent-chip b {
+  display: block;
+  font-size: 14px;
+}
+.irreverent-chip small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.irreverent-chip:hover {
+  border-color: #5a4a70;
+}
+.irreverent-chip.active.off {
+  border-color: #5a8f6a;
+  background: #101a14;
+}
+.irreverent-chip.active.off b {
+  color: #7ddea0;
+}
+.irreverent-chip.active.on {
+  border-color: #e91e8c;
+  background: #1f1220;
+  box-shadow: 0 4px 14px rgba(233, 30, 140, 0.22);
+}
+.irreverent-chip.active.on b {
+  color: var(--pink-glow, #ff6bb5);
+}
+.irreverent-on-hint {
+  color: #ff8ec8;
+}
 
 .action-row {
   display: grid;

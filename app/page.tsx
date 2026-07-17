@@ -66,6 +66,8 @@ export default function Home() {
   const [length, setLength] = useState<ReplyLength>("media");
   const [writeStyle, setWriteStyle] = useState<WriteStyleId>("eristico");
   const [writeStyleCustom, setWriteStyleCustom] = useState("");
+  /** Chip visible: fuerza modo Grok irreverente (además de detección por texto) */
+  const [irreverent, setIrreverent] = useState(false);
 
   const [opponentText, setOpponentText] = useState("");
   const [stanceText, setStanceText] = useState("");
@@ -255,6 +257,7 @@ export default function Home() {
           writeStyle,
           writeStyleCustom:
             writeStyle === "custom" ? writeStyleCustom.trim() || undefined : undefined,
+          irreverent,
           opponentText: attackSource,
           postText: isPro ? postText || attackSource : undefined,
           stanceText,
@@ -739,6 +742,40 @@ export default function Home() {
         </div>
 
         <div className="control-block">
+          <strong className="control-label">Grok irreverente</strong>
+          <p className="control-hint">
+            Foul extremo y tono crudo. El argumento sigue siendo lógico. También se activa si lo pides
+            en las órdenes o en estilo/tipo a tu medida.
+          </p>
+          <div className="irreverent-row" role="group" aria-label="Modo Grok irreverente">
+            <button
+              type="button"
+              className={`irreverent-chip ${!irreverent ? "active off" : ""}`}
+              onClick={() => setIrreverent(false)}
+              aria-pressed={!irreverent}
+            >
+              <b>OFF</b>
+              <small>Firme, sin foul alto</small>
+            </button>
+            <button
+              type="button"
+              className={`irreverent-chip ${irreverent ? "active on" : ""}`}
+              onClick={() => setIrreverent(true)}
+              aria-pressed={irreverent}
+            >
+              <b>ON · Irreverente</b>
+              <small>Crudo, agresivo, profano</small>
+            </button>
+          </div>
+          {irreverent && (
+            <p className="control-hint style-extra-hint irreverent-on-hint">
+              Modo activo: lenguaje explícito como potenciador retórico. La lógica del debate no se
+              negocia.
+            </p>
+          )}
+        </div>
+
+        <div className="control-block">
           <strong className="control-label">Tipo de respuesta</strong>
           <p className="control-hint">
             Sin tecnicismos de adorno. Sin frases incompletas. Sin censura blanda. También{" "}
@@ -875,6 +912,7 @@ export default function Home() {
                 {apiProviderLabel || apiSource || "local"}
                 {apiModel ? ` · ${apiModel}` : ""} · {active.label} · {writeStyle} ·{" "}
                 {FOCUS_GUIDE[focus].label} · {LENGTH_GUIDE[length].label} · {intensity}
+                {irreverent ? " · 🔥 irreverente ON" : ""}
               </span>
             </div>
 
@@ -1157,11 +1195,11 @@ export default function Home() {
         <details>
           <summary>¿Las respuestas van sin censura?</summary>
           <p>
-            Sí: el motor no suaviza el golpe erístico. Argumento siempre lógico y al punto. Si pides
-            groserías o tono irreverente en las órdenes (o en estilo/tipo a tu medida), activa{" "}
-            <b>Grok irreverente</b>: foul extremo como potenciador retórico, sin sustituir la lógica.
-            Sin ese pedido, va firme pero sin lenguaje altamente profano. Tú decides si publicas. No
-            inventa delitos ni doxxing ilegal.
+            Sí: el motor no suaviza el golpe erístico. Argumento siempre lógico y al punto. Activa el
+            chip <b>ON · Irreverente</b> o pide groserías en las órdenes / estilo a tu medida: foul
+            extremo como potenciador retórico, sin sustituir la lógica. Con el chip OFF y sin ese
+            pedido, va firme pero sin lenguaje altamente profano. Tú decides si publicas. No inventa
+            delitos ni doxxing ilegal.
           </p>
         </details>
         <details>

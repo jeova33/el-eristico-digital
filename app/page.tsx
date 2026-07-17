@@ -221,8 +221,9 @@ export default function Home() {
       setApiModel(json.model || "");
       setApiWarning(json.warning || "");
       setAnalysis(d.analysis || "");
-      setVariants(d.variants);
-      setStratagemIds(d.variants[0]?.stratagemIds ?? []);
+      const nextVariants = d.variants ?? [];
+      setVariants(nextVariants);
+      setStratagemIds(nextVariants[0]?.stratagemIds ?? []);
       setSelectedVariant(0);
 
       if (d.council?.turns?.length) {
@@ -233,8 +234,8 @@ export default function Home() {
             agentId: t.agentId as CouncilResult["turns"][0]["agentId"],
             abilities: [],
           })),
-          finalStrike: d.variants[0]?.text || "",
-          narrativeStrike: d.variants[1]?.text || "",
+          finalStrike: nextVariants[0]?.text || "",
+          narrativeStrike: nextVariants[1]?.text || "",
         });
         setCouncilOpen(true);
         setBrowser(null);

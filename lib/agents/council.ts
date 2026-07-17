@@ -1,10 +1,16 @@
 /**
- * Consejo multi-agente: Schopenhauer + influencia + masas + narrativa + abogado del diablo.
- * Debaten el caso y proponen el golpe ganador (sin censura, frases completas).
+ * Consejo multi-agente anclado al CONTENIDO real del post.
+ * Schopenhauer + influencia + masas + narrativa + abogado del diablo.
  */
 
 import { ABILITIES, pickAbilities, type Ability } from "../knowledge/abilities";
 import { polishComplete } from "../knowledge/styles";
+import {
+  analyzeContent,
+  groundedBody,
+  groundedCloser,
+  groundedOpener,
+} from "../content-analysis";
 
 export type AgentId =
   | "schopenhauer"
@@ -62,13 +68,10 @@ export const AGENTS: AgentVoice[] = [
 export type CouncilInput = {
   opponentText: string;
   stanceText: string;
-  /** Quién habla / a qué se dedica */
   personName?: string;
   personRole?: string;
   personContext?: string;
-  /** Narrativa que el usuario quiere expresar */
   narrativeIntent?: string;
-  /** Hallazgos de research web (texto plano) */
   researchNotes?: string;
   seed?: number;
 };
@@ -77,20 +80,15 @@ export type AgentTurn = {
   agentId: AgentId;
   agentName: string;
   color: string;
-  /** Qué ve / diagnostica */
   read: string;
-  /** Golpe que propone */
   move: string;
   abilities: Ability[];
 };
 
 export type CouncilResult = {
   turns: AgentTurn[];
-  /** Síntesis del consejo: cómo ganar */
   synthesis: string;
-  /** Comentario final listo (sin censura, completo) */
   finalStrike: string;
-  /** Comentario alterno más narrativo */
   narrativeStrike: string;
 };
 
@@ -102,85 +100,84 @@ function clipWordSafe(s: string, max: number): string {
   return sp > 20 ? slice.slice(0, sp) : slice;
 }
 
-function h(s: string): number {
-  let x = 0;
-  for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(x);
-}
-
-function quoteOf(text: string): string {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 14) return text.trim();
-  const mid = Math.floor(words.length / 4);
-  return words.slice(mid, mid + 12).join(" ");
-}
-
 export function runCouncil(input: CouncilInput): CouncilResult {
   const seed = input.seed ?? 1;
-  const q = quoteOf(input.opponentText || "su discurso vacío");
+  const content = analyzeContent(input.opponentText || "su discurso vacío");
   const person = [input.personName, input.personRole].filter(Boolean).join(", ");
-  const target = person || "este personaje";
-  const stance = input.stanceText.trim() || "mirar la realidad sin maquillaje";
+  const target = person || "quien publica el boletín";
+  const stance = input.stanceText.trim() || "mirar el cuadro completo, no el indicador de campaña";
   const narrative = input.narrativeIntent?.trim() || stance;
   const research = input.researchNotes?.trim();
+  const q = content.safeQuote;
+  const claim = content.claimSummary;
+  const topic = content.topics[0] || "el tema del post";
+  const pct = content.percents[0];
+  const isStats = content.kind === "estadistica" || content.kind === "exito_gobierno";
 
-  const turns: AgentTurn[] = AGENTS.map((agent, idx) => {
+  const turns: AgentTurn[] = AGENTS.map((agent) => {
     const abilities = pickAbilities(agent.abilityIds).slice(0, 4);
-    const n = h(q + agent.id + String(seed + idx));
-
     let read = "";
     let move = "";
 
     switch (agent.id) {
       case "schopenhauer":
         read = polishComplete(
-          `El rival no está buscando verdad. Está defendiendo el ego con la frase "${clipWordSafe(q, 120)}". Eso se desmonta con amplificación y carga de prueba, no con educación educada`,
+          isStats
+            ? `El rival no trae un argumento abierto: trae un comunicado con claim medible —${clipWordSafe(claim, 160)}. Se desmonta por fuente, definición, recorte temporal y salto causal, no con una cita rota ni pidiendo "un caso" al azar`
+            : `Defiende el ego con: "${clipWordSafe(q, 120)}". Desmontaje: amplificación del claim real + carga de prueba anclada a lo que sí escribió`,
         );
         move = polishComplete(
-          research
-            ? `Estira su punto hasta el ridículo, exige una prueba imposible, y si el fondo se le sostiene ataca el oficio de ${target}. Lo que investigamos solo confirma que habla con pose. No pidas permiso. No suavices`
-            : `Traduce "${clipWordSafe(q, 90)}" al extremo absurdo. Después: una sola prueba medible o silencio. Si se pone técnico, ve a la persona: qué ha construido ${target} para dar lecciones`,
+          isStats
+            ? `Repite su cifra (${pct || content.numbers.slice(0, 2).join(", ") || "el porcentaje del post"}) y exige: 1) fuente primaria, 2) definición del delito, 3) por qué ese tramo de fechas, 4) prueba de que el gobierno causó la baja. Multiplica preguntas sobre SU estadística`
+            : `Estira SU frase hasta el ridículo y exige evidencia de ESE claim. No pelees un espantapájaros`,
         );
         break;
       case "influencia":
         read = polishComplete(
-          `La audiencia no lee el hilo completo. Decide en segundos por afinidad. Quien suene a "gente normal" gana. ${target} está pidiendo estatus, no diálogo`,
+          isStats
+            ? `El post busca autoridad por número: "el semestre más bajo", "48%", "tres órdenes de gobierno". La audiencia compra estatus de logro si nadie pide el tablero crudo`
+            : `Quiere sonar a sentido común. Hay que sonar más "gente de a pie" que el boletín`,
         );
         move = polishComplete(
-          `Habla como portavoz del feed: "cualquiera con dos dedos de frente ya vio el bluff". Usa autoridad percibida (tono seguro) y cierra con escasez: o aterriza ahora o queda como monólogo. Incluye a la audiencia en el nosotros`,
+          isStats
+            ? `Habla al scroller: "bonito el comunicado de ${topic}; ahora enséñame la serie y la fuente, no el eslogan de tranquilidad del pueblo". Autoridad percibida + escasez: o aterriza el método o queda como marketing`
+            : `Portavoz del feed: cualquiera huele el bluff cuando no hay anclaje. Incluye al nosotros`,
         );
         break;
       case "masas":
         read = polishComplete(
-          `Hay que fabricar un "ellos": no pelees con un individuo simpático, pelea con el arquetipo. ${target} es el moralista / el vacío / el cosplay de experto, según el caso`,
+          isStats
+            ? `Arquetipo: el boletín de gobierno / la narrativa de "ya estamos bien". Separar al pueblo del comunicador que vende calma con un indicador`
+            : `Etiqueta al rival como arquetipo (sermón, bluff, vacío), no como persona simpática`,
         );
         move = polishComplete(
-          `Etiquétalo en una palabra que pegue (sermón, bluff, postureo) y sepáralo del pueblo. "Eso no es la gente. Eso es su eco". El enemigo abstracto une likes; el matiz los mata`,
+          isStats
+            ? `Etiqueta: "boletín de logros". Ellos = quienes confunden un % de homicidio doloso con vida tranquila. Nosotros = quienes piden el resto del tablero (extorsión, desaparición, percepción)`
+            : `Etiqueta corta que pegue y separe al rival de la gente normal`,
         );
         break;
       case "narrativa":
         read = polishComplete(
-          `La narrativa que tú quieres imponer es: ${clipWordSafe(narrative, 160)}. El post rival es el villano de esa escena. No es un informe: es orgullo herido o hipocresía en vivo`,
+          `Narrativa a imponer: ${clipWordSafe(narrative, 140)}. El post rival es la escena del "éxito anunciado". El conflicto: boletín vs calle / vs cuadro incompleto`,
         );
         move = polishComplete(
-          `Gancho sucio en la primera línea. Después una escena de dos oraciones donde se vea la hipocresía. Cierra con el kernel: ${clipWordSafe(narrative, 100)}. Suena humano, no a brochure`,
+          isStats
+            ? `Gancho: "Bajó el homicidio doloso en el comunicado; falta todo lo demás." Escena: alguien lee el % y se le vende paz. Cierre con el kernel: ${clipWordSafe(narrative || stance, 100)}`
+            : `Gancho con el claim real del post. Cierre con tu narrativa, no con moral genérica`,
         );
         break;
       case "diablo":
         read = polishComplete(
-          `El mejor golpe del rival sería: "tú también generalizas / no traes datos / eres tan ideológico como yo". Si no lo anticipas, te lo clava en el reply`,
+          isStats
+            ? `El mejor golpe del rival: "niegas los datos", "quieres que la violencia suba en la narrativa", "no traes tus propias cifras". Hay que inocularlo`
+            : `Te van a acusar de no leer o de mala fe. Anticípalo`,
         );
         move = polishComplete(
-          `Inocula la objeción: admítela en media línea y gira el cuchillo ("aunque trajera un PDF, sigue sin responder a ${clipWordSafe(stance, 80)}"). Nunca dejes el último frame al otro`,
+          isStats
+            ? `Inocula: "No niego que un indicador pueda bajar. Niego que un boletín con ${pct || "un %"} y sin metodología sea prueba de 'tranquilidad del pueblo' ni de causalidad de gestión." Luego vuelve a ${clipWordSafe(stance, 80)}`
+            : `Admite lo mínimo del rival y gira al agujero real de SU texto`,
         );
         break;
-    }
-
-    // Variar un poco con seed
-    if (n % 3 === 0 && agent.id === "schopenhauer") {
-      move = polishComplete(
-        `${move} Multiplica preguntas: de dónde sale, quién paga el costo, qué pasa si se equivoca. Que colapse por saturación`,
-      );
     }
 
     return {
@@ -195,41 +192,42 @@ export function runCouncil(input: CouncilInput): CouncilResult {
 
   const synthesis = polishComplete(
     [
-      `Consejo unánime: ganar ante el scroller, no convertir al fan del rival.`,
-      person
-        ? `Blanco: ${person}${input.personContext ? ` (${clipWordSafe(input.personContext, 100)})` : ""}.`
-        : `Blanco: el discurso pegado, sin nombre claro.`,
-      research
-        ? `Intel web: ${clipWordSafe(research, 220)}.`
-        : `Sin ficha web sólida: golpea el vacío de prueba y la pose.`,
-      `Narrativa a imponer: ${clipWordSafe(narrative, 140)}.`,
-      `Arsenal prioritario: amplificación, carga de prueba, etiqueta tribal, gancho narrativo, anticipar el contraataque.`,
-    ].join(" "),
+      `Claim del post (parafraseo fiel): ${clipWordSafe(claim, 200)}.`,
+      `Tipo: ${content.kindLabel}. Temas: ${content.topics.join(", ") || "n/a"}.`,
+      pct || content.numbers.length
+        ? `Cifras en juego: ${[...content.percents, ...content.numbers].slice(0, 6).join(", ")}.`
+        : `Sin cifras claras.`,
+      person ? `Emisor: ${person}.` : "",
+      research ? `Intel: ${clipWordSafe(research, 180)}.` : "",
+      `Ángulos: ${content.dismantleAngles.slice(0, 3).join(" | ")}`,
+      `Narrativa nuestra: ${clipWordSafe(narrative, 100)}.`,
+      `Regla: citar el claim completo o una oración con sentido; nunca mitades sin contexto.`,
+    ]
+      .filter(Boolean)
+      .join(" "),
   );
+
+  // Golpes finales anclados al contenido (mismo motor grounded)
+  const open0 = groundedOpener(content, "datos", seed % 3);
+  const body0 = groundedBody(content, stance, narrative, 0);
+  const close0 = groundedCloser(content, stance, 0);
+  const personLine = person
+    ? `Cuando lo publica ${clipWordSafe(String(input.personName || target), 50)}${input.personRole ? ` (${clipWordSafe(input.personRole, 40)})` : ""}, el marco de logro se vuelve más evidente: estatus de gestión primero, auditoría después.`
+    : "";
 
   const finalStrike = polishComplete(
-    [
-      `Seamos claros con quien lee: "${clipWordSafe(q, 100)}" no es un argumento. Es una pose con teclado.`,
-      person
-        ? `Y cuando lo suelta ${clipWordSafe(String(input.personName || target), 60)}${input.personRole ? `, ${clipWordSafe(input.personRole, 50)}` : ""}, el truco se ve más: estatus primero, prueba después (o nunca).`
-        : `El truco se ve: estatus primero, prueba después (o nunca).`,
-      research
-        ? `Si uno se toma el trabajo de mirar el historial, el patrón no sorprende: ${clipWordSafe(research, 160)}`
-        : `Mientras no traiga un hecho concreto, medible y no anecdótico, esto es fe con Wi-Fi.`,
-      `Aquí no hay gris cómodo: o defendemos ${clipWordSafe(stance, 90)}, o le regalamos el feed al sermonario.`,
-      `Trae una prueba real. Una. Si no puedes, deja de dar lecciones. La audiencia ya eligió entre sentido común y postureo.`,
-    ].join(" "),
+    [open0, ...body0.slice(0, 4), personLine, research ? `Contexto extra: ${clipWordSafe(research, 120)}.` : "", close0]
+      .filter(Boolean)
+      .join(" "),
   );
 
+  const openN = groundedOpener(content, "publico", (seed + 1) % 3);
+  const bodyN = groundedBody(content, stance, narrative, 2);
+  const closeN = groundedCloser(content, stance, 2);
   const narrativeStrike = polishComplete(
-    [
-      `Hay un tipo de frase que solo sirve para que el autor se sienta limpio: "${clipWordSafe(q, 90)}".`,
-      `Lo que queremos decir de verdad es otra cosa: ${clipWordSafe(narrative, 140)}.`,
-      person
-        ? `Cuando ${clipWordSafe(String(input.personName || "ese personaje"), 50)} se para en ese altar, no está informando. Está cobrando peaje de moral.`
-        : `No está informando. Está cobrando peaje de moral.`,
-      `La gente normal no necesita un diccionario para oler el bluff. O aterrizas en la realidad de ${clipWordSafe(stance, 70)}, o te quedas gritando al espejo. Nosotros no vamos a aplaudir el espejo.`,
-    ].join(" "),
+    [openN, bodyN[0], bodyN[1], `La historia que no entra en el comunicado: ${clipWordSafe(narrative, 140)}.`, closeN]
+      .filter(Boolean)
+      .join(" "),
   );
 
   return { turns, synthesis, finalStrike, narrativeStrike };

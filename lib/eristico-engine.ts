@@ -14,6 +14,13 @@ import {
   type Intensity,
 } from "./knowledge/persuasion";
 import { polishComplete, softClipComplete } from "./knowledge/styles";
+import {
+  analyzeContent,
+  groundedBody,
+  groundedCloser,
+  groundedOpener,
+  type ContentAnalysis,
+} from "./content-analysis";
 
 export type { Intensity };
 export type Mode = "contraataque" | "desmontar" | "arsenal" | "pro";
@@ -117,11 +124,8 @@ function clip(s: string, max: number) {
 }
 
 function extractQuote(text: string): string {
-  const cleaned = text.trim().replace(/^["«]|["»]$/g, "");
-  const words = cleaned.split(/\s+/).filter(Boolean);
-  if (words.length <= 8) return clip(cleaned, 90);
-  const mid = Math.floor(words.length / 3);
-  return clip(words.slice(mid, mid + 10).join(" "), 90);
+  // Siempre cita con sentido (oración / claim), nunca rebanada del medio
+  return analyzeContent(text).safeQuote;
 }
 
 function hash(s: string): number {
@@ -154,133 +158,58 @@ function buildBrowser(
   stanceText: string,
   stratagems: Stratagem[],
 ): DebateBrowser {
-  const s = scanSignals(opponentText);
-  const quote = extractQuote(opponentText);
-  const stance = clip(stanceText || "tu postura", 80);
+  const a = analyzeContent(opponentText);
+  const stance = stanceText.trim() || "tu postura";
 
-  let attackProfile = "Opinión suelta disfrazada de veredicto";
-  if (s.insults && s.personal) attackProfile = "Ataque personal (va por ti, no por la idea)";
-  else if (s.moral) attackProfile = "Sermón moral: busca que te sientas culpable";
-  else if (s.authority) attackProfile = "Se pinta de 'experto' sin traer la prueba completa";
-  else if (s.noProof || s.absolutist) attackProfile = "Afirmaciones absolutas sin matices ni prueba";
-  else if (s.empty) attackProfile = "Comentario corto y vacío: más pose que argumento";
-  else if (s.questions > 1) attackProfile = "Lluvia de preguntas para marearte";
+  const weakPoints: WeakPoint[] = a.dismantleAngles.map((detail, i) => ({
+    title: a.kind === "estadistica" || a.kind === "exito_gobierno"
+      ? ["Fuente y método", "Recorte de fechas", "Indicador estrecho", "Causalidad mágica", "Calle vs boletín"][i] ||
+        "Hueco del claim"
+      : ["Sin anclaje", "Marco emocional", "Vacío de prueba", "Pose", "Desvío"][i] || "Hueco",
+    detail,
+    howToWin: a.attackQuestions[i] || "Exige prueba anclada a SU claim, no a un fantasma.",
+  }));
 
-  const weakPoints: WeakPoint[] = [];
-
-  if (s.noProof || s.absolutist || !s.authority) {
-    weakPoints.push({
-      title: "No trae prueba real",
-      detail: `Dice cosas como si fueran hechos, pero no muestra de dónde salen. Frase clave: "${quote}".`,
-      howToWin:
-        "Pídele una sola prueba concreta y medible. Mientras no la traiga, ganas ante el público.",
-    });
-  }
-  if (s.absolutist) {
-    weakPoints.push({
-      title: "Habla en blanco o negro",
-      detail: "Usa siempre/nunca/todos. La vida real tiene grises; su mapa es demasiado simple.",
-      howToWin:
-        "Muestra un solo caso que rompa su 'siempre' o 'nunca'. Con un contraejemplo, se cae el absolutismo.",
-    });
-  }
-  if (s.moral) {
-    weakPoints.push({
-      title: "Cambia el tema a moralina",
-      detail: "En vez de discutir el punto, te empuja a sentirte mala persona.",
-      howToWin:
-        "Nombra el truco en voz alta: 'estás moralizando, no argumentando'. Vuelve al tema concreto.",
-    });
-  }
-  if (s.personal || s.insults) {
-    weakPoints.push({
-      title: "Ataca a la persona",
-      detail: "Cuando alguien insulta o te descalifica, suele ser porque el fondo se le acabó.",
-      howToWin:
-        "Señálalo con calma frente a la audiencia: 'si el argumento fuera fuerte, no haría falta el golpe bajo'.",
-    });
-  }
-  if (s.empty) {
-    weakPoints.push({
-      title: "Comentario demasiado fino",
-      detail: "Hay poco contenido. Fácil de rellenar con humo y parecer profundo.",
-      howToWin: "Exige que complete la idea en una frase clara. El vacío se ve solo.",
-    });
-  }
-  if (s.authority) {
-    weakPoints.push({
-      title: "Autoridad de adorno",
-      detail: "Menciona datos o 'expertos' sin enlazar ni precisar.",
-      howToWin:
-        "Pide el nombre del estudio, el año y el número exacto. Si no puede, era adorno.",
-    });
-  }
-  // Siempre al menos 2 puntos
   if (weakPoints.length < 2) {
     weakPoints.push({
-      title: "No responde a tu marco",
-      detail: `Tu postura (${stance}) puede quedar fuera de su ataque. Eso es un vacío a tu favor.`,
-      howToWin: "Reencuadra: 'el punto real es…' y ancla en lo que tú defiendes.",
-    });
-  }
-  if (weakPoints.length < 3) {
-    weakPoints.push({
-      title: "Juega para su tribu, no para la verdad",
-      detail: "Busca likes de los que ya piensan como él, no convencer con cuidado.",
-      howToWin: "Habla al público del medio: sentido común, ejemplos de la vida diaria.",
+      title: "Tu marco queda fuera",
+      detail: `El post empuja su relato; tu postura (${clip(stance, 80)}) puede reabrir el cuadro.`,
+      howToWin: "Nombra su claim real y ancla el tuyo sin pelear un espantapájaros.",
     });
   }
 
-  const researchLeads = [
-    "¿Dice lo mismo en otros hilos o cambia de opinión según le convenga?",
-    "¿Trae fuentes o solo eslóganes y adjetivos?",
-    "¿Habla desde experiencia real o solo desde el teclado?",
-    "¿Usa siempre el mismo truco (insulto, moralina, 'todos saben')?",
-    stanceText.trim()
-      ? `¿Su ataque realmente choca con tu postura (“${clip(stanceText, 50)}”) o está peleando con un fantasma?`
-      : "¿Qué parte de su frase se cae si le pides un ejemplo real de la calle?",
-  ];
-
-  const topicBits = opponentText
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .split(/\s+/)
-    .filter((w) => w.length > 4)
-    .slice(0, 6)
-    .join(" ");
-
+  const topic = a.topics[0] || "tema del post";
   const searchQueries = [
-    `${topicBits || "tema del debate"} críticas argumentos en contra`,
-    `${topicBits || "afirmación del oponente"} es cierto o falso`,
-    ` falacias en debates sobre ${topicBits || "opiniones en redes"}`,
-    `"${clip(quote, 40)}" contexto`,
-  ];
-
-  const winLevers = [
-    "Ganas ante la audiencia, no ante el oponente. Escribe para el que scrollea.",
-    "Invierte la carga: que él demuestre lo suyo con un nivel absurdo de detalle.",
-    "Aísla una frase suya y enséñala al revés (descontextualización controlada).",
-    "Ofrece solo dos caminos: contigo (sentido común) o con el absurdo de su extremo.",
-    stanceText.trim()
-      ? `Ancla siempre en: ${clip(stanceText, 100)}`
-      : "Define tu postura en una frase y no salgas de ahí.",
-    `Estratagemas listas: ${stratagems.map((x) => `E${x.id}`).join(", ")}.`,
-  ];
-
-  const avoid = [
-    "No entres en su insulto al mismo nivel (pierdes la foto ante el público).",
-    "No te disculpes de más: suena a debilidad.",
-    "No uses tecnicismos largos: la gente deja de leer.",
-    "No respondas solo al ego: responde para que el feed te dé la razón.",
-  ];
+    a.percents[0]
+      ? `${topic} ${a.percents[0]} fuente metodología`
+      : `${topic} datos oficiales contraste`,
+    `${topic} homicidios tendencia críticas ${a.dates.slice(0, 2).join(" ")}`.trim(),
+    `${topic} subregistro o cambio de clasificación`,
+    stanceText.trim() ? `${stanceText.slice(0, 60)} vs ${topic}` : `${topic} percepción de inseguridad`,
+  ].filter((q) => q.replace(/\s+/g, " ").trim().length > 8);
 
   return {
-    attackProfile,
-    plainSummary: `Está diciendo, en corto: “${quote}”. Tipo de golpe: ${attackProfile.toLowerCase()}.`,
+    attackProfile: `${a.kindLabel} · etiqueta: ${a.label}`,
+    plainSummary: `Claim real: ${a.claimSummary} Temas: ${a.topics.join(", ") || "n/a"}. Cifras: ${[...a.percents, ...a.numbers].slice(0, 5).join(", ") || "ninguna"}.`,
     weakPoints: weakPoints.slice(0, 5),
-    researchLeads,
+    researchLeads: [
+      ...a.attackQuestions,
+      "¿El dato sale de SESNSP, INEGI, fiscalías o solo del boletín político?",
+      "¿La serie es comparable (misma definición, mismos estados, mismo tipo de homicidio)?",
+    ],
     searchQueries,
-    winLevers,
-    avoid,
+    winLevers: [
+      `Ataca EL claim que escribió, no un recorte absurdo: "${a.safeQuote.slice(0, 100)}"`,
+      ...a.dismantleAngles.slice(0, 2),
+      stanceText.trim() ? `Ancla en tu postura: ${clip(stanceText, 100)}` : "Define tu postura en una frase.",
+      `Estratagemas: ${stratagems.map((x) => `E${x.id}`).join(", ")}.`,
+    ],
+    avoid: [
+      "No pelees un espantapájaros: no cites mitades de oración sin sentido.",
+      "No pidas 'un caso' si el post ya trajo agregados: pide fuente, método y causalidad.",
+      "No ignores las cifras: úsalas en su contra (auditoría, definición, recorte).",
+      "No te vayas a moral genérica si el post es de seguridad/estadística.",
+    ],
   };
 }
 
@@ -459,28 +388,24 @@ function buildVariantText(
   stanceText: string,
   opts: BuildOpts,
 ): string {
-  const quote = extractQuote(opponentText);
-  const { focus, length, intensity, variantIndex, seed } = opts;
-  const open = pick(openers(focus, intensity, quote, variantIndex), seed + variantIndex);
-  const chunks = bodyChunks(focus, quote, stanceText, variantIndex, seed);
-  // Orden distinto por variante
-  const order =
-    variantIndex === 0
-      ? [0, 1, 2, 5]
-      : variantIndex === 1
-        ? [1, 3, 4, 5]
-        : [2, 0, 1, 3];
-  const ordered = order.map((i) => chunks[i % chunks.length]);
-  const stanceLine = stanceText.trim()
-    ? focus === "filosofico"
-      ? `Lo que se sostiene con más honestidad es esto: ${clip(stanceText, length === "corta" ? 80 : 120)}.`
-      : focus === "datos"
-        ? `Del otro lado hay algo concreto que sí se puede defender: ${clip(stanceText, length === "corta" ? 80 : 120)}.`
-        : `Mientras tanto, la postura que sí le habla a la gente es: ${clip(stanceText, length === "corta" ? 80 : 120)}.`
-    : "";
-  const end = closer(focus, intensity, stanceText, variantIndex + seed);
+  const { focus, length, variantIndex } = opts;
+  // Respuesta ANCLADA al contenido real del post (no plantilla genérica)
+  const analysis: ContentAnalysis = analyzeContent(opponentText);
+  const open = groundedOpener(analysis, focus, variantIndex);
+  const body = groundedBody(analysis, stanceText, stanceText, variantIndex);
+  const end = groundedCloser(analysis, stanceText, variantIndex);
 
-  const pool = [open, ...ordered, stanceLine, end].filter(Boolean);
+  // Intensidad solo afina el filo, no cambia el tema
+  const heat =
+    opts.intensity === "devastador"
+      ? analysis.kind === "exito_gobierno" || analysis.kind === "estadistica"
+        ? "Dejen de vender tranquilidad de pueblo con un solo indicador maquillable."
+        : "Basta de postureo: o hay sustancia o hay show."
+      : opts.intensity === "cirujano"
+        ? "Sin adjetivos de más: solo el agujero del claim."
+        : "";
+
+  const pool = [open, ...body, heat, end].filter(Boolean);
   return polishComplete(applyLength(pool, length));
 }
 

@@ -349,7 +349,7 @@ export default function Home() {
     const payload =
       kind === "counter"
         ? counterattack
-        : `Análisis táctico:\n${analysis}\n\nEl contraataque:\n${counterattack}`;
+        : counterattack;
     if (!payload.trim()) return;
     await navigator.clipboard.writeText(payload);
     setCopied(kind);
@@ -949,12 +949,12 @@ export default function Home() {
             )}
 
             <div className="result-block">
-              <h3>Análisis táctico</h3>
+              <h3>Notas internas (no copies esto al hilo)</h3>
               <p className="analysis-text">{analysis}</p>
             </div>
 
             <div className="result-block">
-              <h3>Elige tu variante (listo para comentario o post)</h3>
+              <h3>Elige el texto a pegar (suena a ti, no a IA)</h3>
               <div className="variant-tabs" role="tablist">
                 {variants.map((v, i) => (
                   <button
@@ -974,18 +974,16 @@ export default function Home() {
 
             <div className="result-block highlight">
               <h3>
-                Listo para publicar (comentario o post){" "}
+                Copia y pega en el grupo{" "}
                 <span className="variant-current">{variants[selectedVariant]?.label ?? ""}</span>
               </h3>
-              <blockquote>{counterattack}</blockquote>
+              <blockquote className="publishable">{counterattack}</blockquote>
+              <p className="copy-hint">Solo este bloque. Las notas de arriba no van al post.</p>
             </div>
 
             <div className="result-actions">
               <button className="copy-button" onClick={() => copyText("counter")}>
-                {copied === "counter" ? "✓ Copiado" : "▣ Copiar texto"}
-              </button>
-              <button className="copy-button secondary" onClick={() => copyText("full")}>
-                {copied === "full" ? "✓ Copiado" : "▣ Análisis + texto"}
+                {copied === "counter" || copied === "full" ? "✓ Copiado" : "▣ Copiar para pegar"}
               </button>
               <button className="social fb" onClick={shareFacebook} aria-label="Facebook">
                 f

@@ -1,6 +1,6 @@
 /**
- * Prompts para Grok / Gemini / NVIDIA.
- * Postura del usuario = órdenes de entrega OBLIGATORIAS en cada variante.
+ * Prompts multi-LLM.
+ * variants[].text = SOLO texto humano copiable (sin meta de IA).
  */
 
 import type { Intensity, Mode, ReplyFocus, ReplyLength } from "../eristico-engine";
@@ -67,58 +67,66 @@ export function lengthBudget(length: ReplyLength): {
 } {
   if (length === "corta") {
     return {
-      hint: "CORTA: 3 a 5 oraciones completas por variante. Un solo bloque denso. Mínimo 280 caracteres por text.",
+      hint: "CORTA: 3–6 oraciones. Mínimo 280 caracteres. Un bloque natural de comentario.",
       minSentences: 3,
       minChars: 280,
-      maxTokens: 1800,
-      retryMaxTokens: 1400,
+      maxTokens: 2000,
+      retryMaxTokens: 1600,
     };
   }
   if (length === "larga") {
     return {
       hint:
-        "LARGA (OBLIGATORIO): cada variante.text debe tener MÍNIMO 18 oraciones y MÍNIMO 1400 caracteres. " +
-        "Desarrolla: 1) apertura, 2) cátedra de datos/argumentos con varios puntos, 3) criterio y juicio, " +
-        "4) desmontaje del claim, 5) cierre. NO resumas. NO acortes. Si te quedas corto, la respuesta se considera inválida.",
-      minSentences: 18,
-      minChars: 1400,
+        "LARGA: como un post de grupo bien escrito. MÍNIMO 16 oraciones y 1200 caracteres por variants[].text. " +
+        "Párrafos. Desarrollo real. NO un mini-reply.",
+      minSentences: 16,
+      minChars: 1200,
       maxTokens: 8192,
       retryMaxTokens: 6000,
     };
   }
   return {
-    hint: "MEDIA: 7 a 11 oraciones completas por variante. Mínimo 650 caracteres por text.",
+    hint: "MEDIA: 7–12 oraciones. Mínimo 600 caracteres. Varios párrafos cortos.",
     minSentences: 7,
-    minChars: 650,
-    maxTokens: 3500,
-    retryMaxTokens: 2800,
+    minChars: 600,
+    maxTokens: 4000,
+    retryMaxTokens: 3000,
   };
+}
+
+/** Quita basura meta si el modelo se cuela en el texto publicable */
+export function sanitizePublishableText(raw: string): string {
+  let t = String(raw || "").trim();
+  // Quitar bloques de análisis / etiquetas
+  t = t.replace(/^#{1,3}\s*.*$/gm, "");
+  t = t.replace(
+    /^(An[aá]lisis\s+T[aá]ctico|El\s+Contraataque|Uso\s+la\s+|Estratagema\s*\d+|Gem\s+personalizada|El\s+Rey\s+de\s+la\s+Disputa).*$/gim,
+    "",
+  );
+  t = t.replace(/\*?An[aá]lisis\s+T[aá]ctico\*?:?[\s\S]*?(?=(\n\n|$))/gi, "");
+  t = t.replace(/\*?El\s+Contraataque\*?:?\s*/gi, "");
+  t = t.replace(/\(Est\.?\s*\d+\)/gi, "");
+  t = t.replace(/Estratagema\s*\d+/gi, "");
+  t = t.replace(/Amplificaci[oó]n\s+Absurda/gi, "");
+  t = t.replace(/Misil\s+Ad\s+Hominem/gi, "");
+  t = t.replace(/Schopenhauer/gi, "");
+  t = t.replace(/\bel oponente\b/gi, "esa postura");
+  t = t.replace(/\bal oponente\b/gi, "a esa idea");
+  t = t.replace(/\bdel oponente\b/gi, "de ese mensaje");
+  t = t.replace(/\s{2,}/g, " ");
+  t = t.replace(/\n{3,}/g, "\n\n");
+  return t.trim();
 }
 
 export function buildSystemPrompt(): string {
   return `${SYSTEM_PROMPT_CORE}
 
-REGLAS CRÍTICAS (obligatorias — si fallas una, fallas todo):
-
-1. COHERENCIA CON EL POST: rebates el claim REAL del oponente/post. Citas solo oraciones completas.
-
-2. INSTRUCCIONES DEL USUARIO (campo POSTURA / ÓRDENES DE ENTREGA):
-   - Son ÓRDENES, no "contexto opcional".
-   - Si el usuario dice "cátedra de datos", "criterio", "frases bíblicas", "tono X", "termina con…", etc.,
-     CADA variante.text DEBE cumplir TODAS esas órdenes de forma visible y explícita.
-   - Ejemplo: si pide frases bíblicas al final, el cierre de cada variante incluye al menos 1–2 versículos
-     o alusiones bíblicas claras (citas reconocibles), no genéricas.
-   - Si pide cátedra de datos: desarrolla varios puntos con hechos, cifras, definiciones, fuentes posibles,
-     no un párrafo flojo.
-
-3. LARGO: respeta el presupuesto de longitud del user message. "Larga" significa TEXTOS LARGOS de verdad.
-   No entregues mini-comentarios si pidió larga.
-
-4. Sin censura blanda. Frases completas. Español natural de redes.
-
-5. JSON puro, sin markdown ni \`\`\`. Tres variantes distintas en ángulo, todas cumpliendo las órdenes del usuario.
-
-6. stratagemIds: enteros 1–38 relevantes.`;
+REGLAS DE SALIDA JSON:
+1. variants[].text = ÚNICAMENTE el texto que el usuario pega en el grupo. Voz humana. Sin meta.
+2. analysis = solo para el panel de la app (ahí sí táctica).
+3. Cumple ÓRDENES DEL USUARIO dentro del texto publicable (criterio, datos, bíblicas, etc.).
+4. Responde al claim REAL del post. Citas solo oraciones completas del original si citas.
+5. JSON puro, sin markdown.`;
 }
 
 export function buildUserPrompt(body: GenerateRequestBody): string {
@@ -135,78 +143,64 @@ export function buildUserPrompt(body: GenerateRequestBody): string {
 INTENSIDAD: ${INTENSITY_GUIDE[body.intensity].label} — ${INTENSITY_GUIDE[body.intensity].style}
 ENFOQUE: ${FOCUS_GUIDE[body.focus].label} — ${FOCUS_GUIDE[body.focus].style}
 LARGO: ${LENGTH_GUIDE[body.length].label}
-PRESUPUESTO DE LONGITUD: ${budget.hint}
+PRESUPUESTO: ${budget.hint}
   → Mínimo ${budget.minSentences} oraciones y ${budget.minChars} caracteres en CADA variants[].text
-ESTILO: ${style?.label || "Erístico"} — ${(style?.rules || []).join(" ")}
+ESTILO: ${style?.label || "Humano"} — ${(style?.rules || []).join(" ")}
 
-=== TEXTO DEL OPONENTE / POST A COMBATIR (FUENTE DE VERDAD) ===
+=== POST O COMENTARIO AL QUE RESPONDES (texto real del hilo) ===
 ${opponent || "(vacío)"}
 
-=== TEXTO DEL POST (si difiere) ===
-${post && post !== opponent ? post : "(igual o no aplica)"}
+=== POST EXTRA (si hay) ===
+${post && post !== opponent ? post : "(igual)"}
 
-=== ÓRDENES DE ENTREGA DEL USUARIO (OBLIGATORIAS EN CADA VARIANTE) ===
-${stance || "(no declaró órdenes; usa criterio crítico de sentido común)"}
+=== ÓRDENES DEL USUARIO (obligatorias DENTRO del texto publicable) ===
+${stance || "Escribe con criterio, voz de miembro del grupo, sin sonar a IA."}
 
-IMPORTANTE: Si hay órdenes arriba (ej. "ten criterio", "cátedra de datos", "termina con frases bíblicas"),
-cada variants[].text debe:
-- Mostrar criterio (juicio claro, no tibio).
-- Si pidió cátedra/datos: desarrollar varios bloques con datos, definiciones y carga de prueba.
-- Si pidió cierre bíblico (o similar): terminar con frases bíblicas explícitas.
-- Cumplir CUALQUIER otra instrucción literal del usuario.
+=== NARRATIVA A IMPONER ===
+${narrative || stance || "(la que gane el hilo con sentido común)"}
 
-=== NARRATIVA / MENSAJE A IMPONER ===
-${narrative || stance || "(no declarada)"}
+=== FICHA ===
+${(body.personName || "").trim() || "n/a"} | ${(body.personRole || "").trim() || "n/a"}
+${(body.personContext || "").trim() || ""}
 
-=== FICHA DEL EMISOR ===
-Nombre: ${(body.personName || "").trim() || "desconocido"}
-Rol: ${(body.personRole || "").trim() || "desconocido"}
-Contexto: ${(body.personContext || "").trim() || "n/a"}
+=== INTEL ===
+${(body.researchNotes || "").trim() || "n/a"}
 
-=== INTEL / RESEARCH ===
-${(body.researchNotes || "").trim() || "sin research externo"}
-
-=== ANÁLISIS LOCAL DE APOYO ===
-Tipo: ${analysis.kindLabel}
+=== APOYO INTERNO (no lo copies al texto publicable) ===
 Claim: ${analysis.claimSummary}
-Cita segura: ${analysis.safeQuote}
-Temas: ${analysis.topics.join(", ") || "n/a"}
+Tipo: ${analysis.kindLabel}
 Cifras: ${[...analysis.percents, ...analysis.numbers].slice(0, 8).join(", ") || "ninguna"}
-Ángulos: ${analysis.dismantleAngles.join(" | ")}
-Preguntas: ${analysis.attackQuestions.join(" | ")}
 
 === TAREA ===
-Genera análisis táctico + ${isPro ? "consejo multi-agente (5 voces) + " : ""}exactamente 3 variantes LISTAS PARA PUBLICAR.
-Las 3 deben:
-1) Atacar el claim real del oponente.
-2) Cumplir al 100% las ÓRDENES DE ENTREGA.
-3) Respetar el PRESUPUESTO DE LONGITUD (${body.length}).
+Devuelve JSON con:
+- analysis: 2–4 frases INTERNAS (táctica). El usuario NO pega esto.
+- variants: 3 objetos. En cada uno, "text" es un comentario/post listo para COPIAR Y PEGAR:
+  * Suena a que el USUARIO lo escribió (primera persona / voz de grupo).
+  * Responde al mensaje de arriba como en un grupo de Facebook.
+  * PROHIBIDO: "el oponente", "análisis táctico", "estratagema", "el contraataque", meta de IA.
+  * Cumple las órdenes del usuario.
+  * Ángulos: A reencuadre · B datos/criterio · C público/cierre (órdenes incluidas).
 
-Ángulos:
-- A "Marco": reencuadra el claim + órdenes del usuario.
-- B "Prueba / cátedra": datos, método, fuentes + órdenes del usuario.
-- C "Público + cierre": audiencia del feed + órdenes del usuario (cierre bíblico si se pidió).
+${isPro ? `council: 5 agentes (schopenhauer, influencia, masas, narrativa, diablo) solo en panel interno; sus "move" describen táctica, NO son el texto a pegar.` : `"council": null`}
 
-${isPro ? `Consejo multi-agente agentId: schopenhauer, influencia, masas, narrativa, diablo.
-Colores: #e91e8c, #7c5cff, #ff6b5e, #ffd84d, #9a94b0.
-Cada turn: read + move anclados a ESTE claim y a las órdenes del usuario.` : `"council": null`}
+Ejemplo de TONO publicable (estructura, NO copies el tema): párrafos naturales, "Llevo un tiempo leyendo…", "En serio…", sin títulos de informe.
 
-Responde SOLO con este JSON:
+JSON:
 {
-  "analysis": "breve: claim + cómo cumples las órdenes del usuario",
-  "attackProfile": "string",
-  "plainSummary": "qué dice el post/comentario",
+  "analysis": "...",
+  "attackProfile": "...",
+  "plainSummary": "...",
   "weakPoints": [{"title":"","detail":"","howToWin":""}],
-  "winLevers": ["..."],
-  "avoid": ["..."],
-  "researchLeads": ["..."],
-  "searchQueries": ["..."],
+  "winLevers": [],
+  "avoid": [],
+  "researchLeads": [],
+  "searchQueries": [],
   "variants": [
-    {"id":"v1","label":"Variante A · Marco","angle":"...","text":"...TEXTO LARGO COMPLETO...","stratagemIds":[1,12,15]},
-    {"id":"v2","label":"Variante B · Prueba","angle":"...","text":"...TEXTO LARGO COMPLETO...","stratagemIds":[15,4,1]},
-    {"id":"v3","label":"Variante C · Público","angle":"...","text":"...TEXTO LARGO COMPLETO...","stratagemIds":[9,5,6]}
+    {"id":"v1","label":"Variante A","angle":"...","text":"...SOLO TEXTO HUMANO PARA PEGAR...","stratagemIds":[1,12]},
+    {"id":"v2","label":"Variante B","angle":"...","text":"...","stratagemIds":[15,4]},
+    {"id":"v3","label":"Variante C","angle":"...","text":"...","stratagemIds":[9,5]}
   ],
-  "council": ${isPro ? `{ "synthesis":"...", "turns":[ {"agentId":"schopenhauer","agentName":"Schopenhauer","color":"#e91e8c","read":"...","move":"..."} ] }` : "null"}
+  "council": null
 }`;
 }
 
@@ -226,7 +220,7 @@ export function parseGrokJson(raw: string): GrokGeneratePayload | null {
         id: v.id || `v${i + 1}`,
         label: v.label || `Variante ${i + 1}`,
         angle: v.angle || "",
-        text: String(v.text || "").trim(),
+        text: sanitizePublishableText(String(v.text || "")),
         stratagemIds: Array.isArray(v.stratagemIds)
           ? v.stratagemIds.filter((n) => typeof n === "number")
           : [],

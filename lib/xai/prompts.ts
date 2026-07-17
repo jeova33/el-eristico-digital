@@ -54,7 +54,7 @@ export type GrokGeneratePayload = {
       move: string;
     }>;
   };
-  source: "grok";
+  source: "xai" | "gemini" | "nvidia" | "grok" | "local";
   model: string;
 };
 
@@ -171,7 +171,7 @@ export function parseGrokJson(raw: string): GrokGeneratePayload | null {
       stratagemIds: Array.isArray(v.stratagemIds) ? v.stratagemIds.filter((n) => typeof n === "number") : [],
     })).filter((v) => v.text.length > 20);
     if (!data.variants.length) return null;
-    data.source = "grok";
+    data.source = data.source || "xai";
     return data;
   } catch {
     return null;

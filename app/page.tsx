@@ -73,10 +73,13 @@ export default function Home() {
   const [browserOpen, setBrowserOpen] = useState(true);
   const [councilOpen, setCouncilOpen] = useState(true);
   const [seed, setSeed] = useState(0);
-  const [apiSource, setApiSource] = useState<"grok" | "local" | "local_fallback" | "">("");
+  const [apiSource, setApiSource] = useState("");
   const [apiModel, setApiModel] = useState("");
+  const [apiProviderLabel, setApiProviderLabel] = useState("");
   const [apiWarning, setApiWarning] = useState("");
   const [apiError, setApiError] = useState("");
+  /** auto | xai | gemini | nvidia */
+  const [llmProvider, setLlmProvider] = useState<"auto" | "xai" | "gemini" | "nvidia">("auto");
 
   const active = useMemo(() => modes.find((item) => item.id === mode)!, [mode]);
   const activeStrats = useMemo(
@@ -178,13 +181,16 @@ export default function Home() {
           narrativeIntent: isPro ? narrativeIntent || stanceText : undefined,
           researchNotes: pack?.notes,
           seed: s,
+          provider: llmProvider === "auto" ? undefined : llmProvider,
         }),
       });
 
       const json = (await res.json()) as {
         ok: boolean;
         error?: string;
-        source?: "grok" | "local" | "local_fallback";
+        source?: string;
+        provider?: string;
+        providerLabel?: string;
         model?: string;
         warning?: string;
         data?: {
@@ -217,8 +223,9 @@ export default function Home() {
       }
 
       const d = json.data;
-      setApiSource(json.source || "");
+      setApiSource(json.source || json.provider || "");
       setApiModel(json.model || "");
+      setApiProviderLabel(json.providerLabel || json.source || "");
       setApiWarning(json.warning || "");
       setAnalysis(d.analysis || "");
       const nextVariants = d.variants ?? [];
@@ -544,6 +551,32 @@ export default function Home() {
         )}
 
         <div className="control-block">
+          <strong className="control-label">Motor IA (API)</strong>
+          <p className="control-hint">
+            Grok (xAI), Gemini (Google) o NVIDIA NIM. Auto = el primero con clave en el servidor.
+          </p>
+          <div className="tone-picker" aria-label="Proveedor LLM">
+            {(
+              [
+                { id: "auto" as const, label: "Auto" },
+                { id: "xai" as const, label: "Grok" },
+                { id: "gemini" as const, label: "Gemini" },
+                { id: "nvidia" as const, label: "NVIDIA" },
+              ] as const
+            ).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={llmProvider === p.id ? "active" : ""}
+                onClick={() => setLlmProvider(p.id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="control-block">
           <strong className="control-label">Estilo de escritura</strong>
           <p className="control-hint">Skills: calle, humano anti-IA, narrativo, erístico, filosófico crudo, datos.</p>
           <div className="style-row">
@@ -628,14 +661,14 @@ export default function Home() {
             {generating || researching
               ? researching
                 ? "Investigando personaje…"
-                : "Grok pensando el claim…"
+                : "IA pensando el claim…"
               : isPro
-                ? "Pro · Grok: research + golpe"
+                ? "Pro · IA: research + golpe"
                 : mode === "desmontar"
-                  ? "Desmontar con Grok"
+                  ? "Desmontar con IA"
                   : mode === "arsenal"
-                    ? "Arsenal con Grok"
-                    : "Generar con Grok (xAI)"}
+                    ? "Arsenal con IA"
+                    : `Generar con ${llmProvider === "auto" ? "IA" : llmProvider === "xai" ? "Grok" : llmProvider === "gemini" ? "Gemini" : "NVIDIA"}`}
           </button>
         </div>
 
@@ -655,11 +688,11 @@ export default function Home() {
             <span className="check">⚔</span>
             <p>
               <strong>
-                Motor principal: <b>Grok (xAI)</b> — coherente con el post real.
+                Motores: <b>Grok</b> · <b>Gemini</b> · <b>NVIDIA</b> — coherentes con el post real.
               </strong>
               <br />
-              Configura <code>XAI_API_KEY</code> en <code>.env.local</code>. Sin clave = motor local
-              (plantillas, peor calidad).
+              Variables: <code>XAI_API_KEY</code> / <code>GEMINI_API_KEY</code> /{" "}
+              <code>NVIDIA_API_KEY</code> (+ opcional <code>LLM_PROVIDER</code>). Sin clave = local.
             </p>
             <span className="ready-copy">▣&nbsp;&nbsp; API</span>
           </div>
@@ -670,9 +703,9 @@ export default function Home() {
             <div className="result-top">
               <span>✦ El Erístico Digital</span>
               <span className="result-badge">
-                {apiSource === "grok" ? `Grok · ${apiModel || "xAI"}` : apiSource || "local"} ·{" "}
-                {active.label} · {writeStyle} · {FOCUS_GUIDE[focus].label} ·{" "}
-                {LENGTH_GUIDE[length].label} · {intensity}
+                {apiProviderLabel || apiSource || "local"}
+                {apiModel ? ` · ${apiModel}` : ""} · {active.label} · {writeStyle} ·{" "}
+                {FOCUS_GUIDE[focus].label} · {LENGTH_GUIDE[length].label} · {intensity}
               </span>
             </div>
 

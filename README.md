@@ -44,23 +44,26 @@ Calle · Humano (anti-IA) · Narrativo · Erístico · Filosófico crudo · Dato
 - `lib/pro-engine.ts` — motor Pro
 - `app/api/research/route.ts` — API research
 
-## API Grok (xAI) — motor principal
+## APIs LLM — Grok · Gemini · NVIDIA
 
-Las respuestas coherentes van por **Grok** en el servidor (`POST /api/generate`).  
-La clave **nunca** va al navegador.
+Las respuestas coherentes van por el servidor (`POST /api/generate`).  
+Las claves **nunca** van al navegador.
 
-1. Crea clave en https://console.x.ai  
-2. En la raíz del proyecto:
+| Proveedor | Variable | Default model | Docs |
+|-----------|----------|---------------|------|
+| **Grok (xAI)** | `XAI_API_KEY` | `grok-4.5` | https://console.x.ai |
+| **Gemini** | `GEMINI_API_KEY` | `gemini-2.5-flash` | https://aistudio.google.com/apikey |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | `meta/llama-3.1-70b-instruct` | https://build.nvidia.com |
 
 ```bash
 copy .env.example .env.local
-# edita .env.local y pon:
-# XAI_API_KEY=xai-...
-# XAI_MODEL=grok-4.5   (opcional)
+# edita y rellena al menos una key
+# LLM_PROVIDER=auto   # o xai | gemini | nvidia
 ```
 
-3. Reinicia el servidor. El badge del resultado debe decir **Grok · …**  
-   Sin clave: motor local (plantillas) con aviso amarillo.
+En la UI puedes elegir **Auto / Grok / Gemini / NVIDIA**.  
+`GET /api/generate` devuelve qué providers están configurados.  
+Sin ninguna key: motor local (plantillas).
 
 ## Correr en local (Windows)
 

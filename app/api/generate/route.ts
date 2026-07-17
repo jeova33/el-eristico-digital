@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { getXaiApiKey, xaiChatCompletions } from "../../../lib/xai/client";
+import {
+  anyLlmConfigured,
+  llmChat,
+  providerLabel,
+  providersStatus,
+  resolveProvider,
+  type LlmProviderId,
+} from "../../../lib/llm/providers";
 import {
   buildSystemPrompt,
   buildUserPrompt,
@@ -11,12 +18,27 @@ import { generatePro } from "../../../lib/pro-engine";
 import type { ResearchPack } from "../../../lib/research/person-research";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 90;
+
+type BodyWithProvider = GenerateRequestBody & {
+  /** xai | gemini | nvidia — opcional; si no, LLM_PROVIDER o primer key disponible */
+  provider?: LlmProviderId | string;
+};
+
+export async function GET() {
+  const active = resolveProvider();
+  return NextResponse.json({
+    ok: true,
+    activeProvider: active,
+    activeLabel: active ? providerLabel(active) : null,
+    providers: providersStatus(),
+  });
+}
 
 export async function POST(req: Request) {
-  let body: GenerateRequestBody;
+  let body: BodyWithProvider;
   try {
-    body = (await req.json()) as GenerateRequestBody;
+    body = (await req.json()) as BodyWithProvider;
   } catch {
     return NextResponse.json({ ok: false, error: "JSON inválido" }, { status: 400 });
   }
@@ -29,18 +51,21 @@ export async function POST(req: Request) {
     );
   }
 
-  const hasKey = Boolean(getXaiApiKey());
+  const provider = resolveProvider(body.provider);
+  const hasLlm = anyLlmConfigured() && Boolean(provider);
 
-  // —— Preferir Grok ——
-  if (hasKey) {
+  // —— LLM (Grok / Gemini / NVIDIA) ——
+  if (hasLlm && provider) {
     try {
-      const result = await xaiChatCompletions({
+      const result = await llmChat({
+        provider,
         messages: [
           { role: "system", content: buildSystemPrompt() },
           { role: "user", content: buildUserPrompt(body) },
         ],
-        temperature: body.intensity === "cirujano" ? 0.55 : body.intensity === "devastador" ? 0.9 : 0.75,
-        maxTokens: body.length === "larga" ? 5000 : 3500,
+        temperature:
+          body.intensity === "cirujano" ? 0.5 : body.intensity === "devastador" ? 0.85 : 0.7,
+        maxTokens: body.length === "larga" ? 2800 : body.length === "corta" ? 1200 : 2000,
       });
 
       const parsed = parseGrokJson(result.content);
@@ -48,36 +73,42 @@ export async function POST(req: Request) {
         parsed.model = result.model;
         return NextResponse.json({
           ok: true,
-          source: "grok" as const,
+          source: provider,
+          provider,
+          providerLabel: providerLabel(provider),
           model: result.model,
           usage: result.usage,
           data: parsed,
         });
       }
 
-      // Si el JSON falla, un reintento corto pidiendo solo el JSON
-      const retry = await xaiChatCompletions({
+      // Reintento barato: solo JSON
+      const retry = await llmChat({
+        provider,
         messages: [
           {
             role: "system",
             content:
-              "Devuelve ÚNICAMENTE JSON válido según el esquema pedido. Sin markdown. Sin explicación.",
+              "Devuelve ÚNICAMENTE JSON válido del esquema (analysis, variants[3], etc.). Sin markdown. Sin explicación.",
           },
           {
             role: "user",
-            content: `Reescribe esto como el JSON del esquema de variantes (analysis, variants[3], etc.). Contenido previo:\n${result.content.slice(0, 6000)}`,
+            content: `Convierte a JSON del esquema de variantes. Contenido previo:\n${result.content.slice(0, 4000)}`,
           },
         ],
-        temperature: 0.2,
-        maxTokens: 4000,
+        temperature: 0.15,
+        maxTokens: 1800,
       });
       const parsed2 = parseGrokJson(retry.content);
       if (parsed2) {
         parsed2.model = retry.model;
         return NextResponse.json({
           ok: true,
-          source: "grok" as const,
+          source: provider,
+          provider,
+          providerLabel: providerLabel(provider),
           model: retry.model,
+          usage: retry.usage,
           data: parsed2,
         });
       }
@@ -85,31 +116,34 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: "Grok respondió pero no en JSON usable. Revisa el modelo o reintenta.",
-          rawPreview: result.content.slice(0, 500),
+          error: `${providerLabel(provider)} respondió pero no en JSON usable. Reintenta o cambia de proveedor.`,
+          provider,
+          rawPreview: result.content.slice(0, 400),
         },
         { status: 502 },
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : "error_xai";
-      // Fallback local solo si Grok falla
+      const message = err instanceof Error ? err.message : "error_llm";
       const fallback = localFallback(body);
       return NextResponse.json({
         ok: true,
         source: "local_fallback" as const,
+        provider: "local",
         warning: message,
         data: fallback,
       });
     }
   }
 
-  // —— Sin API key: local + aviso ——
+  // —— Sin ninguna API key ——
   const fallback = localFallback(body);
   return NextResponse.json({
     ok: true,
     source: "local" as const,
+    provider: "local",
     warning:
-      "Sin XAI_API_KEY: motor local (plantillas). Configura .env.local con XAI_API_KEY para Grok.",
+      "Sin API keys. Configura XAI_API_KEY y/o GEMINI_API_KEY y/o NVIDIA_API_KEY (y opcional LLM_PROVIDER=xai|gemini|nvidia).",
+    providers: providersStatus(),
     data: fallback,
   });
 }
@@ -142,7 +176,7 @@ function localFallback(body: GenerateRequestBody) {
     });
     return {
       analysis: out.analysis,
-      attackProfile: "Modo local (sin Grok)",
+      attackProfile: "Modo local (sin LLM cloud)",
       plainSummary: body.opponentText.slice(0, 200),
       weakPoints: [],
       winLevers: [],

@@ -11,6 +11,7 @@ import {
 import {
   buildSystemPrompt,
   buildUserPrompt,
+  extractInternalAnalysis,
   lengthBudget,
   parseGrokJson,
   type GenerateRequestBody,
@@ -88,6 +89,12 @@ export async function POST(req: Request) {
           body.intensity === "cirujano" ? 0.45 : body.intensity === "devastador" ? 0.8 : 0.65,
         maxTokens: budget.maxTokens,
       });
+
+      // 🔍 DEBUG: analisis_interno — nunca sale al frontend
+      const internalAnalysis = extractInternalAnalysis(result.content);
+      if (internalAnalysis) {
+        console.log("[PRO-ENGINE][analisis_interno]", internalAnalysis.slice(0, 600));
+      }
 
       let parsed = parseGrokJson(result.content);
 

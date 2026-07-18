@@ -133,6 +133,24 @@ export function sanitizePublishableText(raw: string): string {
   return t.trim();
 }
 
+/**
+ * Extrae el contenido de <respuesta_final>...</respuesta_final>.
+ * Si no encuentra la etiqueta, devuelve el texto íntegro (fallback seguro).
+ */
+export function extractFinalResponse(raw: string): string {
+  const match = raw.match(/<respuesta_final>([\s\S]*?)<\/respuesta_final>/i);
+  if (match?.[1]) return match[1].trim();
+  return raw;
+}
+
+/**
+ * Extrae el análisis interno para logging/debug (NUNCA va al frontend).
+ */
+export function extractInternalAnalysis(raw: string): string | null {
+  const match = raw.match(/<analisis_interno>([\s\S]*?)<\/analisis_interno>/i);
+  return match?.[1]?.trim() ?? null;
+}
+
 export function buildSystemPrompt(body?: GenerateRequestBody): string {
   const irreverent = body
     ? isIrreverentMode(
@@ -148,12 +166,20 @@ export function buildSystemPrompt(body?: GenerateRequestBody): string {
   return `${SYSTEM_PROMPT_CORE}
 
 ${irreverent ? `${GROK_IRREVERENTE_ACTIVE_BLOCK}\n` : ""}
+<instrucciones_de_procesamiento>
+Para generar tu salida, es OBLIGATORIO que sigas esta secuencia exacta en el campo "analysis" y en cada "variants[].text":
+PASO 1: DISECCIÓN DEL OPONENTE
+Escribe tu análisis dentro de las etiquetas <analisis_interno>. Disecciona el comentario y determina la debilidad principal.
+PASO 2: APLICAR POSTURA Y RESPONDER
+Escribe el texto final listo para publicar dentro de las etiquetas <respuesta_final>. Utiliza la conclusión de tu <analisis_interno> para defender estrictamente la postura del usuario.
+</instrucciones_de_procesamiento>
+
 ARSENAL INTERNO (usa 4–8 habilidades en analysis; NUNCA las nombres en variants[].text):
 ${abilitiesDigestForPrompt(20)}
 
 REGLAS DE SALIDA JSON:
-1. variants[].text = ÚNICAMENTE el texto que el usuario pega en el grupo. Voz humana. Sin meta.
-2. analysis = panel interno: di qué habilidades/tácticas usaste (ids o nombres). Si modo irreverente, anótalo.
+1. variants[].text = estructura XML OBLIGATORIA: <analisis_interno>tu disección</analisis_interno><respuesta_final>texto publicable</respuesta_final>
+2. analysis = estructura XML OBLIGATORIA: <analisis_interno>tácticas y habilidades usadas</analisis_interno><respuesta_final>resumen del panel interno</respuesta_final>
 3. Cumple ÓRDENES DEL USUARIO dentro del texto publicable (incl. groserías solo si las pidió o chip ON).
 4. Responde al claim REAL del post. Argumento lógico siempre. Citas solo oraciones completas si citas.
 5. JSON puro, sin markdown.
@@ -225,11 +251,13 @@ Habilidades sugeridas para este post: ${selectedBlock}
 
 === TAREA ===
 Devuelve JSON con:
-- analysis: 2–5 frases INTERNAS (táctica + habilidades usadas). El usuario NO pega esto.
-- variants: 3 objetos. En cada uno, "text" es un comentario/post listo para COPIAR Y PEGAR:
+- analysis: estructura XML OBLIGATORIA → <analisis_interno>tácticas y habilidades usadas (2–5 frases)</analisis_interno><respuesta_final>resumen del panel interno</respuesta_final>
+- variants: 3 objetos. En cada uno, "text" DEBE tener esta estructura XML OBLIGATORIA:
+  <analisis_interno>disección táctica del mensaje</analisis_interno><respuesta_final>texto publicable que el usuario pega en el grupo</respuesta_final>
+  Reglas para el contenido de <respuesta_final>:
   * Suena a que el USUARIO lo escribió (primera persona / voz de grupo).
   * Responde al mensaje de arriba como en un grupo de Facebook.
-  * PROHIBIDO: "el oponente", "análisis táctico", "estratagema", "el contraataque", meta de IA.
+  * PROHIBIDO dentro de <respuesta_final>: "el oponente", "análisis táctico", "estratagema", "el contraataque", meta de IA.
   * Cumple las órdenes del usuario.
   * Argumentación lógica y al punto aunque el tono sea crudo.
   * Ángulos: A reencuadre · B datos/criterio · C público/cierre (órdenes incluidas).
@@ -240,7 +268,7 @@ Ejemplo de TONO publicable (estructura, NO copies el tema): párrafos naturales,
 
 JSON:
 {
-  "analysis": "...",
+  "analysis": "<analisis_interno>tácticas usadas: burden_of_proof, amplify...</analisis_interno><respuesta_final>resumen panel interno...</respuesta_final>",
   "attackProfile": "...",
   "plainSummary": "...",
   "weakPoints": [{"title":"","detail":"","howToWin":""}],
@@ -249,12 +277,11 @@ JSON:
   "researchLeads": [],
   "searchQueries": [],
   "variants": [
-    {"id":"v1","label":"Variante A","angle":"...","text":"...SOLO TEXTO HUMANO PARA PEGAR...","stratagemIds":[1,12]},
-    {"id":"v2","label":"Variante B","angle":"...","text":"...","stratagemIds":[15,4]},
-    {"id":"v3","label":"Variante C","angle":"...","text":"...","stratagemIds":[9,5]}
+    {"id":"v1","label":"Variante A","angle":"...","text":"<analisis_interno>disección...</analisis_interno><respuesta_final>texto publicable para pegar...</respuesta_final>","stratagemIds":[1,12]},
+    {"id":"v2","label":"Variante B","angle":"...","text":"<analisis_interno>disección...</analisis_interno><respuesta_final>texto publicable...</respuesta_final>","stratagemIds":[15,4]},
+    {"id":"v3","label":"Variante C","angle":"...","text":"<analisis_interno>disección...</analisis_interno><respuesta_final>texto publicable...</respuesta_final>","stratagemIds":[9,5]}
   ],
-  "council": null
-}`;
+  "council": null}`;
 }
 
 export function parseGrokJson(raw: string): GrokGeneratePayload | null {
@@ -267,13 +294,17 @@ export function parseGrokJson(raw: string): GrokGeneratePayload | null {
   try {
     const data = JSON.parse(t) as GrokGeneratePayload;
     if (!data.variants || !Array.isArray(data.variants) || data.variants.length < 1) return null;
+    // Filtro XML: extraer solo <respuesta_final> del campo analysis
+    if (data.analysis) {
+      data.analysis = extractFinalResponse(String(data.analysis));
+    }
     data.variants = data.variants
       .slice(0, 5)
       .map((v, i) => ({
         id: v.id || `v${i + 1}`,
         label: v.label || `Variante ${i + 1}`,
         angle: v.angle || "",
-        text: sanitizePublishableText(String(v.text || "")),
+        text: sanitizePublishableText(extractFinalResponse(String(v.text || ""))),
         stratagemIds: Array.isArray(v.stratagemIds)
           ? v.stratagemIds.filter((n) => typeof n === "number")
           : [],
